@@ -69,7 +69,7 @@ async def chat(req: ChatRequest):
         "session_id": req.session_id,
         "msg_role":   "user",
         "content":    req.message,
-        "timestamp":  datetime.utcnow()
+        "timestamp":  datetime.now()
     })
 
     # ── Route to correct model ─────────────────────────────────────────────────
@@ -100,7 +100,7 @@ async def chat(req: ChatRequest):
         "msg_role":   "assistant",
         "content":    reply,
         "model_used": model_used,
-        "timestamp":  datetime.utcnow()
+        "timestamp":  datetime.utcoffset()
     })
 
     return ChatResponse(reply=reply, model_used=model_used, session_id=req.session_id)
@@ -122,4 +122,4 @@ def clear_history(session_id: str):
 
 
 # ── Serve PWA static files ─────────────────────────────────────────────────────
-app.mount("/", StaticFiles(directory="/zoeygraystone/pwa", html=True), name="pwa")
+app.mount("/", StaticFiles(directory="/zoey/pwa", html=True), name="pwa")
