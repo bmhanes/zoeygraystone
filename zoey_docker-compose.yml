@@ -25,7 +25,9 @@ services:
   # ── ZoeyDB (MongoDB) ─────────────────────────────────────────────────────────
   zoeydb:
     container_name: zoeydb
-    image: mongo:4.4
+    image: mongo:4.4 # Downgraded to 4.4 due to AVX hardware issue on some CPUs
+    #image: mongo:7 # Uncomment this line to upgrade to MongoDB 7 when the AVX issue is resolved
+
     restart: always
     environment:
       - TZ=America/Chicago
