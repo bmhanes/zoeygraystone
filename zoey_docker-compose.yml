@@ -14,8 +14,8 @@ services:
     volumes:
       - ./zoeycore:/zoey/app      # live reload picks up code changes
       - ./pwa:/zoey/pwa           # PWA frontend served by FastAPI
-      - ./logs:/zoey/logs
-      - ./backups:/zoey/backups
+      - ./logs:/zoey/logs         # app logs persisted to host
+      - ./backups:/zoey/backups   # DB backups persisted to host  
     depends_on:
       zoeydb:
         condition: service_healthy
@@ -32,7 +32,7 @@ services:
     ports:
       - "27017:27017"             # expose for local dev tools (Compass, etc.)
     volumes:
-      - ./data/mongo:/data/db
+      - ./data/mongo:/data/db  # persist data to host
     healthcheck:
       test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
       interval: 10s

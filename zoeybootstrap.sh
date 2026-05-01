@@ -98,7 +98,14 @@ success "All required files present"
 
 # ── Create runtime directories ────────────────────────────────────
 info "Creating runtime directories..."
+chmod 755 /opt/graystone
 mkdir -p \
+  "$INSTALL_DIR/data/mongo" \
+  "$INSTALL_DIR/logs" \
+  "$INSTALL_DIR/backups"
+chmod -R 750 "$INSTALL_DIR"
+chmod 755 \
+  "$INSTALL_DIR/data" \
   "$INSTALL_DIR/data/mongo" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/backups"
