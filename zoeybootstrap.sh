@@ -33,7 +33,7 @@ echo -e "${NC}"
 
 # ── Require commit hash ──────────────────────────────────────────
 if [[ -z "$COMMIT" ]]; then
-  die "Usage: sudo $0 <commit-hash>\n       Example: sudo $0 a3f9c21"
+  die "Usage: sudo $0 <commit-hash>\n       Example: sudo $0 master"
 fi
 
 info "Target commit : ${BOLD}${COMMIT}${NC}"
