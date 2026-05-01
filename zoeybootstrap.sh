@@ -113,7 +113,7 @@ mkdir -p \
 success "Runtime directories created"
 
 # ── Assign ownership to service user ─────────────────────────────
-info "Setting ownership to service user ${SERVICE_USER}..."
+info "Setting ownership to service user"
 chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
 chmod 750 "$INSTALL_DIR"
 chmod 755 \
