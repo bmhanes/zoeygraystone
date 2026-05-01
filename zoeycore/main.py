@@ -35,6 +35,7 @@ class ChatRequest(BaseModel):
     mode: str = "standard"   # "standard" = Mistral | "advanced" = Claude
 
 class ChatResponse(BaseModel):
+    model_config = {'protected_namespaces': ()}   # ← add this line
     reply: str
     model_used: str
     session_id: str
