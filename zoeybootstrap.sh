@@ -113,15 +113,15 @@ mkdir -p \
 success "Runtime directories created"
 
 # ── Assign ownership to service user ─────────────────────────────
-info "Setting ownership to service user"
-chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+info "Setting ownership to service user zoey..."
+chown -R "zoey":"zoey" "$INSTALL_DIR"
 chmod 750 "$INSTALL_DIR"
 chmod 755 \
   "$INSTALL_DIR/data" \
   "$INSTALL_DIR/data/mongo" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/backups"
-success "Ownership set to ${SERVICE_USER}"
+success "Ownership set to user account zoey"
 
 # ── Set up .env if missing ────────────────────────────────────────
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then
@@ -184,7 +184,7 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=${SERVICE_USER}
+User=zoey
 Group=docker
 WorkingDirectory=${INSTALL_DIR}
 
