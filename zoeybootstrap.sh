@@ -176,7 +176,7 @@ info "Creating systemd service..."
 cat > /etc/systemd/system/zoey.service << EOF
 [Unit]
 Description=Zoey AI Assistant — Graystone Solutions
-Documentation=https://gitlab.com/graystone-solutions/zoey
+Documentation=https://github.com/GraystoneSolutions/zoeygraystone/README.md
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service

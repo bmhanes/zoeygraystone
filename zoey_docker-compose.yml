@@ -25,7 +25,7 @@ services:
   # ── ZoeyDB (MongoDB) ─────────────────────────────────────────────────────────
   zoeydb:
     container_name: zoeydb
-    image: mongo:7
+    image: mongo:4.4
     restart: always
     environment:
       - TZ=America/Chicago
