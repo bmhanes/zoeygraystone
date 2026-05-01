@@ -10,7 +10,7 @@ services:
       - TZ=America/Chicago
       - MONGO_URI=mongodb://zoeydb:27017/zoey
     ports:
-      - "80:80"
+      - "8000:8000"
     volumes:
       - ./zoeycore:/zoey/app      # live reload picks up code changes
       - ./pwa:/zoey/pwa           # PWA frontend served by FastAPI

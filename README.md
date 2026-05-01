@@ -67,7 +67,7 @@ docker compose logs zoeycore --follow
 
 | Service       | URL                                  |
 |---------------|--------------------------------------|
-| Zoey Chat PWA | http://10.242.1.1:8000               |
+| Zoey Chat PWA | http://10.242.1.1:8000              |
 | API Docs      | http://10.242.1.1:8000/docs          |
 | API Health    | http://10.242.1.1:8000/health        |
 | MongoDB UI    | http://10.242.1.1:8081               |
