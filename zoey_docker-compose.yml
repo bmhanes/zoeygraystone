@@ -35,11 +35,17 @@ services:
       - "27017:27017"             # expose for local dev tools (Compass, etc.)
     volumes:
       - ./data/mongo:/data/db  # persist data to host
-    healthcheck:
-      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"]
-      interval: 10s
-      timeout: 5s
-      retries: 5
+    healthcheck: # Updated for MongoDB 4.4 compatibility
+#      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"] 
+#      interval: 10s
+#      timeout: 5s
+#      retries: 5 
+       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+       interval: 15s
+       timeout: 10s
+       retries: 10
+       start_period: 30s
+#       
     networks:
       - zoeynet
 
