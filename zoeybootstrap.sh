@@ -1,14 +1,14 @@
-#!/usr/bin/env bash
+!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 #  Zoey Bootstrap Script — Graystone Solutions
-#  Pull the latest build commit and sets up /opt/graystone/zoey
+#  Pull the latest build commit and sets up /home/graystone/zoey
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
 # ── Config ──────────────────────────────────────────────────────
 GITHUB_REPO="https://github.com/GraystoneSolutions/zoeygraystone.git"   # ← update if needed
-INSTALL_DIR="/opt/graystone/zoey"
+INSTALL_DIR="/home/graystone/zoey"
 COMMIT="${1:-}"   # Pass commit hash as first argument
 
 # ── Colors ──────────────────────────────────────────────────────
@@ -46,11 +46,18 @@ for cmd in git docker; do
 done
 success "Dependencies found (git, docker)"
 
-# ── Create /opt/graystone if needed ──────────────────────────────
-if [[ ! -d /opt/graystone ]]; then
-  info "Creating /opt/graystone..."
-  mkdir -p /opt/graystone
-  success "Created /opt/graystone"
+# ── Create /home/graystone if needed ──────────────────────────────
+if [[ ! -d /home/graystone ]]; then
+  info "Creating /home/graystone..."
+  mkdir -p /home/graystone
+  success "Created /home/graystone"
+# ── Create Zoey User ───────────────────────────────────────────
+sudo useradd --system --no-create-home --shell /usr/sbin/nologin zoey
+sudo mkdir -p /home/graystone/zoey
+sudo chown -R zoey:zoey /home/graystone
+sudo chmod 750 /home/graystone/zoey
+sudo usermod -aG docker zoey
+
 fi
 
 # ── Handle existing install ───────────────────────────────────────
@@ -98,12 +105,23 @@ success "All required files present"
 
 # ── Create runtime directories ────────────────────────────────────
 info "Creating runtime directories..."
-chmod 755 /opt/graystone
+chmod 755 /home/graystone
 mkdir -p \
   "$INSTALL_DIR/data/mongo" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/backups"
 success "Runtime directories created"
+
+# ── Assign ownership to service user ─────────────────────────────
+info "Setting ownership to service user ${SERVICE_USER}..."
+chown -R "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR"
+chmod 750 "$INSTALL_DIR"
+chmod 755 \
+  "$INSTALL_DIR/data" \
+  "$INSTALL_DIR/data/mongo" \
+  "$INSTALL_DIR/logs" \
+  "$INSTALL_DIR/backups"
+success "Ownership set to ${SERVICE_USER}"
 
 # ── Set up .env if missing ────────────────────────────────────────
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then
@@ -152,6 +170,78 @@ info "Building Docker images..."
 docker compose -f "$INSTALL_DIR/zoey_docker-compose.yml" build
 success "Docker images built"
 
+# ── Create systemd service ────────────────────────────────────────
+info "Creating systemd service..."
+
+cat > /etc/systemd/system/zoey.service << EOF
+[Unit]
+Description=Zoey AI Assistant — Graystone Solutions
+Documentation=https://gitlab.com/graystone-solutions/zoey
+After=network-online.target docker.service
+Wants=network-online.target
+Requires=docker.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+User=${SERVICE_USER}
+Group=docker
+WorkingDirectory=${INSTALL_DIR}
+
+# Start the stack
+ExecStart=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml up -d --build
+
+# Stop the stack
+ExecStop=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml down
+
+# Restart policy
+Restart=on-failure
+RestartSec=10s
+
+# Logging
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zoey
+
+# Security hardening
+NoNewPrivileges=yes
+ProtectSystem=strict
+ReadWritePaths=${INSTALL_DIR}
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+success "systemd unit file written to /etc/systemd/system/zoey.service"
+
+# ── Reload systemd and enable service ────────────────────────────
+info "Reloading systemd daemon..."
+systemctl daemon-reload
+success "systemd daemon reloaded"
+
+info "Enabling Zoey service to start on boot..."
+systemctl enable zoey.service
+success "Zoey service enabled"
+
+# ── Offer to start the service now ───────────────────────────────
+echo ""
+read -rp "  Start Zoey now? [Y/n]: " start_confirm
+if [[ "${start_confirm,,}" != "n" ]]; then
+  info "Starting Zoey..."
+  systemctl start zoey.service
+  sleep 3
+  if systemctl is-active --quiet zoey.service; then
+    success "Zoey is running"
+  else
+    warn "Zoey may not have started cleanly. Check status with:"
+    warn "  systemctl status zoey.service"
+    warn "  journalctl -u zoey.service -f"
+  fi
+else
+  info "Skipped. Start Zoey manually when ready:"
+  info "  systemctl start zoey.service"
+fi
+
 # ── Summary ───────────────────────────────────────────────────────
 echo ""
 echo -e "${BOLD}${GREEN}═══════════════════════════════════════════${NC}"
@@ -162,6 +252,10 @@ echo -e "  ${BOLD}Install path:${NC}  ${INSTALL_DIR}"
 echo -e "  ${BOLD}Commit:${NC}        ${COMMIT}"
 echo ""
 echo -e "  ${BOLD}Next steps:${NC}"
-echo -e "  ${CYAN}1.${NC}  Watch the logs:      ${BOLD}docker compose logs -f${NC}"
-#echo -e "  ${CYAN}2.${NC}  Install Additional Services:      ${BOLD}docker compose logs -f${NC}"
+echo -e "  ${CYAN}1.${NC}  Start Zoey:      ${BOLD}systemctl start zoey.service      # start${NC}"
+echo -e "  ${CYAN}2.${NC}  Stop Zoey:      ${BOLD}systemctl stop zoey.service       # stop${NC}"
+echo -e "  ${CYAN}3.${NC}  Restart Zoey:      ${BOLD}systemctl restart zoey.service    # restart${NC}"
+echo -e "  ${CYAN}4.${NC}  Check Status:      ${BOLD}systemctl status zoey.service     # health check${NC}"
+echo -e "  ${CYAN}5.${NC}  View Logs:      ${BOLD}journalctl -u zoey.service -f     # live logs${NC}"
+
 echo ""
