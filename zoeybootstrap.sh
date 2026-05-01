@@ -108,7 +108,7 @@ chmod 755 \
   "$INSTALL_DIR/data" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/backups"
-chmod -R 750 "$INSTALL_DIR/data/mongo" \
+chmod -R 750 "$INSTALL_DIR/data/mongo"
 success "Runtime directories created"
 
 # ── Set up .env if missing ────────────────────────────────────────
