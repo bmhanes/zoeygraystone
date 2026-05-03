@@ -10,10 +10,13 @@ Zoey is written in the python language and developed to operate on a static Linu
 Future plans include several code modules which can be installed for interfacing with various platforms such as social media networks, or smart home systems, for life-managment and assistance platforms.
 
 For more information see: [Project Zoey](https://graystone.solutions/project_zoey)
+
+## CURRENT ### 
+Phase 1: Local LLM and LDAP
+Moved from Mistral API calls to local Mistral ollama with pull of LLM mixtral:8x7b
+Added support for LDAP Authentication to a local DC when testing in a local network
+
 ## Phase 0: Backend Scaffold + PWA Frontend
-
----
-
 ## Stack
 | Layer       | Technology                          |
 |-------------|-------------------------------------|
@@ -35,22 +38,22 @@ For more information see: [Project Zoey](https://graystone.solutions/project_zoe
 git clone https://github.com/GraystoneSolutions/zoeygraystone.git
 cd zoeygraystone
 ```
-
-### 2. Create your .env file
-```bash
-cp .env.example .env
-nano .env
-```
-Fill in your real API keys. **Never commit .env to git.**
-
-### 3. Run Bootstrap file to start the install to /opt/graystone/zoey
+### 2. Run Bootstrap file to start the install to /opt/graystone/zoey
 chmod +x zoey_bootstrap.sh
 Before running this file, pass the git branch hash as a value.
 Example:
 
 ./sh zoey_bootstrap.sh master
 
+### 3. Create your .env file
+```bash
+cp .env.example .env
+nano .env
 ```
+Fill in your real API keys. **Never commit .env to git.**
+
+```
+### 4. Create your .env file
 Bootstrap will start the docker build process by the following command:
 docker compose up --build -d zoey_docker-compose.yml
 
@@ -78,14 +81,6 @@ docker compose logs zoeycore --follow
 
 ## API Endpoints
 
-### POST /chat
-Send a message to Zoey.
-```json
-{
-  "message": "Who is Daniel Graystone?",
-  "session_id": "optional-session-id",
-  "mode": "standard"
-}
 ```
 Set `mode` to `"advanced"` to route to Claude instead of Mistral.
 
@@ -134,7 +129,7 @@ docker ps -a
 docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up -d
 
 
-## Project Structure
+## Phase 1: Project Structure
 ```
 zoey/
 ├── docker-compose.yml          # Full stack definition
@@ -155,12 +150,12 @@ zoey/
 
 ---
 
-## Phase Roadmap
+## Zoey Phase Roadmap
 
 | Phase | Goal                                  | Status     |
 |-------|---------------------------------------|------------|
 | 0     | Backend scaffold + PWA frontend       | ✅ Done    |
-| 1     | Authentication, Memory, Persistence   | In Progress|           
+| 1     | Authentication, Memory, Persistence   | In Test    |           
 | 2     | Memory, personality, long-term context| Planned    |
 | 3     | Azure production deployment + AKS     | Planned    |
 | 4     | Swift UI for Apple Ecosystem          | Planned    |
