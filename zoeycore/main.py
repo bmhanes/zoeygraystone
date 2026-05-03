@@ -5,7 +5,7 @@ from pydantic import BaseModel
 from anthropic import Anthropic
 from mistralai import Mistral
 from pymongo import MongoClient
-from datetime import datetime
+from datetime import datetime, timezone
 import os
 
 # ── App Setup ─────────────────────────────────────────────────────────────────
@@ -35,9 +35,9 @@ class ChatRequest(BaseModel):
     mode: str = "standard"   # "standard" = Mistral | "advanced" = Claude
 
 class ChatResponse(BaseModel):
-    model_config = {'protected_namespaces': ()}   # ← add this line
+    model_config = {'protected_namespaces': ()}
     reply: str
-    model_used: str
+    engine: str
     session_id: str
 
 # ── System Prompt ──────────────────────────────────────────────────────────────
@@ -70,7 +70,7 @@ async def chat(req: ChatRequest):
         "session_id": req.session_id,
         "msg_role":   "user",
         "content":    req.message,
-        "timestamp":  datetime.now()
+        "timestamp":  datetime.now(timezone.utc)
     })
 
     # ── Route to correct model ─────────────────────────────────────────────────
@@ -83,7 +83,7 @@ async def chat(req: ChatRequest):
             messages=messages
         )
         reply      = response.content[0].text
-        model_used = "claude-sonnet"
+        engine     = "claude-sonnet"
 
     else:
         # Mistral for standard responses
@@ -93,18 +93,18 @@ async def chat(req: ChatRequest):
             messages=mistral_messages
         )
         reply      = response.choices[0].message.content
-        model_used = "mistral-small"
+        engine     = "mistral-small"
 
     # Save assistant reply to MongoDB
     conversations.insert_one({
         "session_id": req.session_id,
         "msg_role":   "assistant",
         "content":    reply,
-        "model_used": model_used,
-        "timestamp":  datetime.utcoffset()
+        "engine":     engine,
+        "timestamp":  datetime.now(timezone.utc)
     })
 
-    return ChatResponse(reply=reply, model_used=model_used, session_id=req.session_id)
+    return ChatResponse(reply=reply, engine=engine, session_id=req.session_id)
 
 
 @app.get("/history/{session_id}")
