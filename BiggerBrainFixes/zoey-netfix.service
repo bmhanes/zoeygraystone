@@ -1,0 +1,16 @@
+[Unit]
+Description=Zoey Network Fix — nftables rules for Docker 29.x on Ubuntu 24.04
+After=docker.service zoey.service
+Requires=docker.service
+BindsTo=zoey.service
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+ExecStart=/usr/local/bin/zoey_network_fix.sh
+StandardOutput=journal
+StandardError=journal
+SyslogIdentifier=zoey-netfix
+
+[Install]
+WantedBy=multi-user.target

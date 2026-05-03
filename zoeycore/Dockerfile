@@ -9,9 +9,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 # Copy application code
 COPY main.py .
 
-# Create PWA directory (will be volume-mounted or copied in)
+# Create required directories
 RUN mkdir -p /zoey/pwa /zoey/logs /zoey/backups
 
 EXPOSE 8000
 
-CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000", "--reload"]
+# No --reload flag: hot reload causes uvicorn path crashes in Docker
+CMD ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
