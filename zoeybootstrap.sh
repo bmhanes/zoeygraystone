@@ -163,6 +163,8 @@ chown -R root:docker "$INSTALL_DIR" 2>/dev/null || true
 chmod -R 750 "$INSTALL_DIR"
 chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
 chmod 044 "$INSTALL_DIR/.env.example" 2>/dev/null || true
+chown zoey:zoey /home/graystone/zoey/.env
+chmod 640 /home/graystone/zoey/.env
 success "Permissions set"
 
 # ── Docker Build Phase ───────────────────────────────────────────────────
