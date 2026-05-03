@@ -9,13 +9,14 @@ services:
     environment:
       - TZ=America/Chicago
       - MONGO_URI=mongodb://zoeydb:27017/zoey
+      - OLLAMA_URL=http://ollama:11434
     ports:
       - "8000:8000"
     volumes:
-      - ./zoeycore:/zoey/app      # live reload picks up code changes
-      - ./pwa:/zoey/pwa           # PWA frontend served by FastAPI
-      - ./logs:/zoey/logs         # app logs persisted to host
-      - ./backups:/zoey/backups   # DB backups persisted to host  
+      - ./zoeycore:/zoey/app
+      - ./pwa:/zoey/pwa
+      - ./logs:/zoey/logs
+      - ./backups:/zoey/backups
     depends_on:
       zoeydb:
         condition: service_healthy
@@ -25,27 +26,20 @@ services:
   # ── ZoeyDB (MongoDB) ─────────────────────────────────────────────────────────
   zoeydb:
     container_name: zoeydb
-    image: mongo:4.4 # Downgraded to 4.4 due to AVX hardware issue on some CPUs
-    #image: mongo:7 # Uncomment this line to upgrade to MongoDB 7 when the AVX issue is resolved
-
+    image: mongo:4.4
     restart: always
     environment:
       - TZ=America/Chicago
     ports:
-      - "27017:27017"             # expose for local dev tools (Compass, etc.)
+      - "27017:27017"
     volumes:
-      - ./data/mongo:/data/db  # persist data to host
-    healthcheck: # Updated for MongoDB 4.4 compatibility
-#      test: ["CMD", "mongosh", "--eval", "db.adminCommand('ping')"] 
-#      interval: 10s
-#      timeout: 5s
-#      retries: 5 
-       test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
-       interval: 15s
-       timeout: 10s
-       retries: 10
-       start_period: 30s
-#       
+      - ./data/mongo:/data/db
+    healthcheck:
+      test: ["CMD", "mongo", "--eval", "db.adminCommand('ping')"]
+      interval: 15s
+      timeout: 10s
+      retries: 10
+      start_period: 60s
     networks:
       - zoeynet
 
@@ -63,6 +57,20 @@ services:
     depends_on:
       zoeydb:
         condition: service_healthy
+    networks:
+      - zoeynet
+
+  # ── Ollama (Local Mixtral) ────────────────────────────────────────────────────
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    restart: always
+    environment:
+      - TZ=America/Chicago
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
     networks:
       - zoeynet
 

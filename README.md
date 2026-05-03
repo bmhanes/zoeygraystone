@@ -20,11 +20,11 @@ For more information see: [Project Zoey](https://graystone.solutions/project_zoe
 | Backend     | Python 3.12, FastAPI, Uvicorn       |
 | AI (Standard) | Mistral AI (mistral-small-latest) |
 | AI (Advanced) | Anthropic Claude (claude-sonnet)  |
-| Database    | MongoDB 7                           |
+| Database    | MongoDB 7 (4.4 if lacking AVS)      |
 | DB Admin UI | Mongo Express (port 8081)           |
 | Frontend    | Vanilla HTML/CSS/JS PWA             |
 | Networking  | ZeroTier (dev), HTTPS (production)  |
-| Registry    | GitLab Container Registry           |
+| Registry    | Github Registry                     |
 
 ---
 
@@ -105,25 +105,34 @@ Health check — returns status and version.
 ### Watch logs live
 ```bash
 docker compose logs -f
-```
-
-### Restart just the backend (after code changes)
-```bash
-docker compose restart zoeycore
-```
-*(The volume mount + `--reload` flag means most code changes hot-reload automatically)*
-
-### Stop everything
-```bash
-docker compose down
-```
-
-### Wipe everything including data (careful!)
-```bash
-docker compose down -v
-```
-
 ---
+Emergency Maintenance Controls
+# CAUTION: Know what you are doing! This will nuke all containers and roll a clean Zoey!
+# Show all running Docker Containers
+docker ps -a
+
+Build Docker Containers Up:
+docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up
+
+Tear Dockers Containers Down:
+docker compose -f /home/graystone/zoey/zoey_docker-compose.yml down
+
+Fix Corrupted Containers
+sudo kill -9 $(docker inspect zoeycore --format='{{.State.Pid}}')
+sudo kill -9 $(docker inspect zoeydb-ui --format='{{.State.Pid}}')
+sudo kill -9 $(docker inspect zoeydb --format='{{.State.Pid}}')
+
+# Force Remove all Containers
+docker rm -f $(docker ps -aq)
+
+# Clean up and restart docker
+docker network prune -f
+sudo systemctl restart docker
+docker ps -a
+
+# Reinstall all containers
+docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up -d
+
 
 ## Project Structure
 ```
@@ -134,7 +143,8 @@ zoey/
 ├── zoeycore/
 │   ├── Dockerfile
 │   ├── main.py                 # FastAPI app + AI routing
-│   └── requirements.txt
+│   └── auth.py                 # Authenticate to LDAP Server
+│   └── requirements.txt|   
 ├── pwa/
 │   └── index.html              # PWA chat frontend
 ├── data/
@@ -149,7 +159,8 @@ zoey/
 
 | Phase | Goal                                  | Status     |
 |-------|---------------------------------------|------------|
-| 0     | Backend scaffold + PWA frontend       | ✅ Now     |
-| 1     | SwiftUI iOS app                       | Planned    |
+| 0     | Backend scaffold + PWA frontend       | ✅ Done    |
+| 1     | Authentication, Memory, Persistence   | In Progress|           
 | 2     | Memory, personality, long-term context| Planned    |
 | 3     | Azure production deployment + AKS     | Planned    |
+| 4     | Swift UI for Apple Ecosystem          | Planned    |

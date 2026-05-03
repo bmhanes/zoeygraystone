@@ -12,28 +12,24 @@
   <link href="https://fonts.googleapis.com/css2?family=Space+Mono:ital,wght@0,400;0,700;1,400&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
 
   <style>
-    /* ── Variables ─────────────────────────────────────────────── */
     :root {
-      --bg:          #0a0f1e;
-      --surface:     #111827;
-      --surface2:    #1a2235;
-      --border:      #1e2d47;
-      --accent:      #00d4ff;
-      --accent2:     #0066ff;
-      --accent-dim:  rgba(0, 212, 255, 0.12);
-      --text:        #e2e8f0;
-      --text-dim:    #64748b;
-      --user-bg:     #0f2545;
-      --zoey-bg:     #111827;
-      --danger:      #ff4560;
-      --success:     #00e5a0;
-      --font-ui:     'Syne', sans-serif;
-      --font-mono:   'Space Mono', monospace;
-      --radius:      12px;
-      --transition:  0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      --bg:         #0a0f1e;
+      --surface:    #111827;
+      --surface2:   #1a2235;
+      --border:     #1e2d47;
+      --accent:     #00d4ff;
+      --accent2:    #0066ff;
+      --accent-dim: rgba(0, 212, 255, 0.12);
+      --text:       #e2e8f0;
+      --text-dim:   #64748b;
+      --danger:     #ff4560;
+      --success:    #00e5a0;
+      --font-ui:    'Syne', sans-serif;
+      --font-mono:  'Space Mono', monospace;
+      --radius:     12px;
+      --transition: 0.2s cubic-bezier(0.4, 0, 0.2, 1);
     }
 
-    /* ── Reset ─────────────────────────────────────────────────── */
     *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
     html, body { height: 100%; overflow: hidden; }
 
@@ -46,7 +42,6 @@
       height: 100dvh;
     }
 
-    /* ── Animated grid background ──────────────────────────────── */
     body::before {
       content: '';
       position: fixed;
@@ -57,6 +52,149 @@
       background-size: 40px 40px;
       pointer-events: none;
       z-index: 0;
+    }
+
+    /* ── Login Screen ──────────────────────────────────────────── */
+    #loginScreen {
+      position: fixed;
+      inset: 0;
+      z-index: 100;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+      background: var(--bg);
+    }
+
+    #loginScreen.hidden { display: none; }
+
+    .login-card {
+      width: 100%;
+      max-width: 400px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 40px 36px;
+      position: relative;
+      z-index: 1;
+    }
+
+    .login-logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: var(--font-mono);
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--bg);
+      margin: 0 auto 24px;
+      box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
+      animation: glow 3s ease-in-out infinite;
+    }
+
+    @keyframes glow {
+      0%, 100% { box-shadow: 0 0 40px rgba(0, 212, 255, 0.3); }
+      50%       { box-shadow: 0 0 60px rgba(0, 212, 255, 0.5); }
+    }
+
+    .login-title {
+      text-align: center;
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      margin-bottom: 4px;
+    }
+
+    .login-title span { color: var(--accent); }
+
+    .login-sub {
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      margin-bottom: 32px;
+    }
+
+    .login-field {
+      margin-bottom: 16px;
+    }
+
+    .login-field label {
+      display: block;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.08em;
+      margin-bottom: 8px;
+    }
+
+    .login-field input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      color: var(--text);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      padding: 12px 16px;
+      outline: none;
+      transition: border-color var(--transition), box-shadow var(--transition);
+    }
+
+    .login-field input::placeholder { color: var(--text-dim); }
+
+    .login-field input:focus {
+      border-color: var(--accent);
+      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
+    }
+
+    .login-btn {
+      width: 100%;
+      padding: 14px;
+      margin-top: 8px;
+      background: linear-gradient(135deg, var(--accent2), var(--accent));
+      border: none;
+      border-radius: var(--radius);
+      color: var(--bg);
+      font-family: var(--font-ui);
+      font-size: 14px;
+      font-weight: 700;
+      letter-spacing: 0.06em;
+      cursor: pointer;
+      transition: opacity var(--transition), transform var(--transition);
+    }
+
+    .login-btn:hover  { opacity: 0.85; transform: scale(1.01); }
+    .login-btn:active { transform: scale(0.99); }
+    .login-btn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+
+    .login-error {
+      margin-top: 16px;
+      padding: 10px 14px;
+      background: rgba(255, 69, 96, 0.1);
+      border: 1px solid var(--danger);
+      border-radius: var(--radius);
+      color: var(--danger);
+      font-family: var(--font-mono);
+      font-size: 11px;
+      text-align: center;
+      display: none;
+    }
+
+    .login-error.visible { display: block; }
+
+    .login-notice {
+      margin-top: 20px;
+      text-align: center;
+      font-family: var(--font-mono);
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
     }
 
     /* ── Header ────────────────────────────────────────────────── */
@@ -72,11 +210,7 @@
       border-bottom: 1px solid var(--border);
     }
 
-    .header-left {
-      display: flex;
-      align-items: center;
-      gap: 12px;
-    }
+    .header-left { display: flex; align-items: center; gap: 12px; }
 
     .zoey-avatar {
       width: 38px;
@@ -91,27 +225,12 @@
       font-weight: 700;
       color: var(--bg);
       flex-shrink: 0;
-      position: relative;
     }
-
-    .zoey-avatar::after {
-      content: '';
-      position: absolute;
-      inset: -3px;
-      border-radius: 50%;
-      background: conic-gradient(var(--accent), var(--accent2), var(--accent));
-      z-index: -1;
-      animation: spin 4s linear infinite;
-      opacity: 0.6;
-    }
-
-    @keyframes spin { to { transform: rotate(360deg); } }
 
     .header-info h1 {
       font-size: 16px;
       font-weight: 800;
       letter-spacing: 0.05em;
-      color: var(--text);
       line-height: 1;
     }
 
@@ -123,50 +242,27 @@
       margin-top: 2px;
     }
 
-    .status-dot {
+    .header-right {
       display: flex;
       align-items: center;
-      gap: 6px;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-dim);
+      gap: 16px;
     }
 
-    .status-dot::before {
-      content: '';
-      width: 7px;
-      height: 7px;
-      border-radius: 50%;
-      background: var(--success);
-      box-shadow: 0 0 8px var(--success);
-      animation: pulse 2s ease-in-out infinite;
-    }
-
-    @keyframes pulse {
-      0%, 100% { opacity: 1; }
-      50%       { opacity: 0.4; }
-    }
-
-    /* ── Model toggle ──────────────────────────────────────────── */
-    .model-toggle {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-    }
-
-    .toggle-label {
+    .user-badge {
       font-family: var(--font-mono);
       font-size: 10px;
       color: var(--text-dim);
       letter-spacing: 0.06em;
     }
 
-    .toggle-switch {
-      position: relative;
-      width: 44px;
-      height: 22px;
+    .user-badge span {
+      color: var(--accent);
     }
 
+    .model-toggle { display: flex; align-items: center; gap: 8px; }
+    .toggle-label { font-family: var(--font-mono); font-size: 10px; color: var(--text-dim); letter-spacing: 0.06em; }
+
+    .toggle-switch { position: relative; width: 44px; height: 22px; }
     .toggle-switch input { opacity: 0; width: 0; height: 0; }
 
     .toggle-track {
@@ -192,18 +288,46 @@
       transition: var(--transition);
     }
 
-    .toggle-switch input:checked + .toggle-track {
-      background: var(--accent-dim);
-      border-color: var(--accent);
+    .toggle-switch input:checked + .toggle-track { background: var(--accent-dim); border-color: var(--accent); }
+    .toggle-switch input:checked + .toggle-track::after { left: calc(100% - 17px); background: var(--accent); box-shadow: 0 0 8px var(--accent); }
+
+    .logout-btn {
+      background: none;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text-dim);
+      font-family: var(--font-mono);
+      font-size: 9px;
+      padding: 4px 10px;
+      cursor: pointer;
+      letter-spacing: 0.06em;
+      transition: border-color var(--transition), color var(--transition);
     }
 
-    .toggle-switch input:checked + .toggle-track::after {
-      left: calc(100% - 17px);
-      background: var(--accent);
-      box-shadow: 0 0 8px var(--accent);
+    .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    .status-dot {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      font-family: var(--font-mono);
+      font-size: 10px;
+      color: var(--text-dim);
     }
 
-    /* ── Messages area ─────────────────────────────────────────── */
+    .status-dot::before {
+      content: '';
+      width: 7px;
+      height: 7px;
+      border-radius: 50%;
+      background: var(--success);
+      box-shadow: 0 0 8px var(--success);
+      animation: pulse 2s ease-in-out infinite;
+    }
+
+    @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: 0.4; } }
+
+    /* ── Messages ──────────────────────────────────────────────── */
     #messages {
       position: relative;
       z-index: 1;
@@ -220,7 +344,6 @@
     #messages::-webkit-scrollbar-track { background: transparent; }
     #messages::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
 
-    /* ── Message bubbles ───────────────────────────────────────── */
     .message {
       display: flex;
       gap: 10px;
@@ -234,12 +357,8 @@
       to   { opacity: 1; transform: translateY(0); }
     }
 
-    .message.user {
-      align-self: flex-end;
-      flex-direction: row-reverse;
-    }
-
-    .message.zoey { align-self: flex-start; }
+    .message.user  { align-self: flex-end; flex-direction: row-reverse; }
+    .message.zoey  { align-self: flex-start; }
 
     .msg-avatar {
       width: 28px;
@@ -255,21 +374,10 @@
       margin-top: 4px;
     }
 
-    .message.user .msg-avatar {
-      background: var(--accent2);
-      color: white;
-    }
+    .message.user .msg-avatar { background: var(--accent2); color: white; }
+    .message.zoey .msg-avatar { background: linear-gradient(135deg, var(--accent2), var(--accent)); color: var(--bg); }
 
-    .message.zoey .msg-avatar {
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
-      color: var(--bg);
-    }
-
-    .msg-content {
-      display: flex;
-      flex-direction: column;
-      gap: 4px;
-    }
+    .msg-content { display: flex; flex-direction: column; gap: 4px; }
 
     .msg-bubble {
       padding: 12px 16px;
@@ -280,17 +388,15 @@
     }
 
     .message.user .msg-bubble {
-      background: var(--user-bg);
+      background: #0f2545;
       border: 1px solid rgba(0, 102, 255, 0.3);
       border-bottom-right-radius: 4px;
-      color: var(--text);
     }
 
     .message.zoey .msg-bubble {
-      background: var(--zoey-bg);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-bottom-left-radius: 4px;
-      color: var(--text);
     }
 
     .msg-meta {
@@ -311,33 +417,17 @@
       margin-left: 6px;
     }
 
-    .model-badge.mistral {
-      background: rgba(255, 100, 50, 0.15);
-      color: #ff8c5a;
-      border: 1px solid rgba(255, 100, 50, 0.3);
-    }
-
-    .model-badge.claude {
-      background: var(--accent-dim);
-      color: var(--accent);
-      border: 1px solid rgba(0, 212, 255, 0.3);
-    }
+    .model-badge.ollama { background: rgba(100, 200, 100, 0.15); color: #5dbb63; border: 1px solid rgba(100, 200, 100, 0.3); }
+    .model-badge.claude { background: var(--accent-dim); color: var(--accent); border: 1px solid rgba(0, 212, 255, 0.3); }
 
     /* ── Typing indicator ──────────────────────────────────────── */
-    .typing-indicator {
-      display: none;
-      align-self: flex-start;
-      align-items: center;
-      gap: 10px;
-      padding: 4px 0;
-    }
-
+    .typing-indicator { display: none; align-self: flex-start; align-items: center; gap: 10px; padding: 4px 0; }
     .typing-indicator.visible { display: flex; }
 
     .typing-dots {
       display: flex;
       gap: 4px;
-      background: var(--zoey-bg);
+      background: var(--surface);
       border: 1px solid var(--border);
       border-radius: var(--radius);
       border-bottom-left-radius: 4px;
@@ -345,8 +435,7 @@
     }
 
     .typing-dots span {
-      width: 6px;
-      height: 6px;
+      width: 6px; height: 6px;
       border-radius: 50%;
       background: var(--accent);
       animation: typing 1.2s ease-in-out infinite;
@@ -360,7 +449,7 @@
       30%            { opacity: 1;   transform: scale(1.2); }
     }
 
-    /* ── Welcome screen ────────────────────────────────────────── */
+    /* ── Welcome ───────────────────────────────────────────────── */
     #welcome {
       position: absolute;
       inset: 0;
@@ -368,7 +457,7 @@
       flex-direction: column;
       align-items: center;
       justify-content: center;
-      gap: 24px;
+      gap: 20px;
       padding: 40px;
       text-align: center;
       pointer-events: none;
@@ -377,44 +466,11 @@
 
     #welcome.hidden { opacity: 0; }
 
-    .welcome-logo {
-      width: 72px;
-      height: 72px;
-      border-radius: 50%;
-      background: linear-gradient(135deg, var(--accent2), var(--accent));
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-family: var(--font-mono);
-      font-size: 24px;
-      font-weight: 700;
-      color: var(--bg);
-      box-shadow: 0 0 40px rgba(0, 212, 255, 0.3);
-      animation: glow 3s ease-in-out infinite;
-    }
-
-    @keyframes glow {
-      0%, 100% { box-shadow: 0 0 40px rgba(0, 212, 255, 0.3); }
-      50%       { box-shadow: 0 0 60px rgba(0, 212, 255, 0.5); }
-    }
-
-    .welcome-title {
-      font-size: 28px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-    }
-
+    .welcome-title { font-size: 26px; font-weight: 800; }
     .welcome-title span { color: var(--accent); }
+    .welcome-sub { font-family: var(--font-mono); font-size: 11px; color: var(--text-dim); letter-spacing: 0.06em; line-height: 1.8; }
 
-    .welcome-sub {
-      font-family: var(--font-mono);
-      font-size: 12px;
-      color: var(--text-dim);
-      letter-spacing: 0.06em;
-      line-height: 1.8;
-    }
-
-    /* ── Input area ────────────────────────────────────────────── */
+    /* ── Input ─────────────────────────────────────────────────── */
     .input-area {
       position: relative;
       z-index: 10;
@@ -424,11 +480,7 @@
       border-top: 1px solid var(--border);
     }
 
-    .input-row {
-      display: flex;
-      gap: 10px;
-      align-items: flex-end;
-    }
+    .input-row { display: flex; gap: 10px; align-items: flex-end; }
 
     #userInput {
       flex: 1;
@@ -448,15 +500,10 @@
     }
 
     #userInput::placeholder { color: var(--text-dim); }
-
-    #userInput:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
-    }
+    #userInput:focus { border-color: var(--accent); box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1); }
 
     #sendBtn {
-      width: 46px;
-      height: 46px;
+      width: 46px; height: 46px;
       border-radius: var(--radius);
       background: linear-gradient(135deg, var(--accent2), var(--accent));
       border: none;
@@ -471,7 +518,6 @@
     #sendBtn:hover  { opacity: 0.85; transform: scale(1.05); }
     #sendBtn:active { transform: scale(0.95); }
     #sendBtn:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
-
     #sendBtn svg { width: 18px; height: 18px; fill: white; }
 
     .input-hint {
@@ -483,7 +529,6 @@
       letter-spacing: 0.05em;
     }
 
-    /* ── Error toast ───────────────────────────────────────────── */
     #errorToast {
       position: fixed;
       bottom: 90px;
@@ -502,24 +547,40 @@
       z-index: 100;
     }
 
-    #errorToast.show {
-      opacity: 1;
-      transform: translateX(-50%) translateY(0);
-    }
+    #errorToast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
 
-    /* ── Responsive ────────────────────────────────────────────── */
     @media (max-width: 480px) {
-      header { padding: 12px 14px; }
-      .header-info h1 { font-size: 14px; }
-      .model-toggle .toggle-label { display: none; }
-      #messages { padding: 14px 12px; gap: 12px; }
+      .toggle-label, .user-badge { display: none; }
+      #messages { padding: 14px 12px; }
       .message { max-width: 94%; }
     }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
+  <!-- ── Login Screen ─────────────────────────────────────────── -->
+  <div id="loginScreen">
+    <div class="login-card">
+      <div class="login-logo">Z</div>
+      <div class="login-title">Welcome to <span>Zoey</span></div>
+      <div class="login-sub">GRAYSTONE SOLUTIONS · AUTHORIZED ACCESS ONLY</div>
+
+      <div class="login-field">
+        <label>REDSTONE USERNAME</label>
+        <input type="text" id="loginUsername" placeholder="username" autocomplete="username" autocapitalize="none" />
+      </div>
+      <div class="login-field">
+        <label>PASSWORD</label>
+        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+      </div>
+
+      <button class="login-btn" id="loginBtn">AUTHENTICATE</button>
+      <div class="login-error" id="loginError"></div>
+      <div class="login-notice">ACCESS RESTRICTED TO AUTHORIZED GRAYSTONE PERSONNEL</div>
+    </div>
+  </div>
+
+  <!-- ── Header ───────────────────────────────────────────────── -->
   <header>
     <div class="header-left">
       <div class="zoey-avatar">Z</div>
@@ -528,23 +589,24 @@
         <div class="tagline">GRAYSTONE SOLUTIONS · AI ASSISTANT</div>
       </div>
     </div>
-    <div style="display:flex; align-items:center; gap:16px;">
+    <div class="header-right">
+      <div class="user-badge">LOGGED IN AS <span id="headerUsername">—</span></div>
       <div class="model-toggle">
-        <span class="toggle-label">ADVANCED</span>
+        <span class="toggle-label">CLAUDE</span>
         <label class="toggle-switch">
           <input type="checkbox" id="modeToggle" />
           <span class="toggle-track"></span>
         </label>
       </div>
       <div class="status-dot" id="statusDot">ONLINE</div>
+      <button class="logout-btn" id="logoutBtn">LOGOUT</button>
     </div>
   </header>
 
-  <!-- Messages -->
+  <!-- ── Messages ─────────────────────────────────────────────── -->
   <div id="messages">
     <div id="welcome">
-      <div class="welcome-logo">Z</div>
-      <div class="welcome-title">Hello, I'm <span>Zoey</span></div>
+      <div class="welcome-title">Hello, <span id="welcomeName">there</span></div>
       <div class="welcome-sub">
         GRAYSTONE SOLUTIONS AI ASSISTANT<br/>
         CYBERSECURITY · AI GOVERNANCE · COMPLIANCE<br/><br/>
@@ -552,113 +614,177 @@
       </div>
     </div>
     <div class="typing-indicator" id="typingIndicator">
-      <div class="msg-avatar" style="background: linear-gradient(135deg, #0066ff, #00d4ff); color: #0a0f1e; font-family: 'Space Mono'; font-size:10px; font-weight:700; width:28px; height:28px; border-radius:50%; display:flex; align-items:center; justify-content:center; flex-shrink:0;">Z</div>
-      <div class="typing-dots">
-        <span></span><span></span><span></span>
-      </div>
+      <div class="msg-avatar" style="background:linear-gradient(135deg,#0066ff,#00d4ff);color:#0a0f1e;font-family:'Space Mono';font-size:10px;font-weight:700;width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;flex-shrink:0;">Z</div>
+      <div class="typing-dots"><span></span><span></span><span></span></div>
     </div>
   </div>
 
-  <!-- Input -->
+  <!-- ── Input ─────────────────────────────────────────────────── -->
   <div class="input-area">
     <div class="input-row">
-      <textarea
-        id="userInput"
-        placeholder="Ask Zoey anything..."
-        rows="1"
-        autocomplete="off"
-        autocorrect="off"
-        spellcheck="true"
-      ></textarea>
+      <textarea id="userInput" placeholder="Ask Zoey anything..." rows="1" autocomplete="off" spellcheck="true"></textarea>
       <button id="sendBtn" aria-label="Send">
-        <svg viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/>
-        </svg>
+        <svg viewBox="0 0 24 24"><path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z"/></svg>
       </button>
     </div>
     <div class="input-hint">ENTER TO SEND · SHIFT+ENTER FOR NEW LINE · TOGGLE FOR CLAUDE MODE</div>
   </div>
 
-  <!-- Error Toast -->
   <div id="errorToast"></div>
 
   <script>
-    // ── Config ──────────────────────────────────────────────────────────────────
-    const API_BASE   = window.location.origin;
-    const SESSION_ID = 'session_' + Math.random().toString(36).slice(2, 10);
+    const API_BASE = window.location.origin;
 
-    // ── Elements ────────────────────────────────────────────────────────────────
-    const messagesEl  = document.getElementById('messages');
-    const inputEl     = document.getElementById('userInput');
-    const sendBtn     = document.getElementById('sendBtn');
-    const modeToggle  = document.getElementById('modeToggle');
-    const typingEl    = document.getElementById('typingIndicator');
-    const welcomeEl   = document.getElementById('welcome');
-    const errorToast  = document.getElementById('errorToast');
-    const statusDot   = document.getElementById('statusDot');
+    // ── State ────────────────────────────────────────────────────
+    let token        = sessionStorage.getItem('zoey_token') || null;
+    let displayName  = sessionStorage.getItem('zoey_display_name') || '';
+    let username     = sessionStorage.getItem('zoey_username') || '';
+    let isLoading    = false;
+    let welcomeShown = true;
 
-    let welcomeVisible = true;
-    let isLoading      = false;
+    // ── Elements ─────────────────────────────────────────────────
+    const loginScreen    = document.getElementById('loginScreen');
+    const loginUsername  = document.getElementById('loginUsername');
+    const loginPassword  = document.getElementById('loginPassword');
+    const loginBtn       = document.getElementById('loginBtn');
+    const loginError     = document.getElementById('loginError');
+    const headerUsername = document.getElementById('headerUsername');
+    const welcomeName    = document.getElementById('welcomeName');
+    const messagesEl     = document.getElementById('messages');
+    const inputEl        = document.getElementById('userInput');
+    const sendBtn        = document.getElementById('sendBtn');
+    const modeToggle     = document.getElementById('modeToggle');
+    const typingEl       = document.getElementById('typingIndicator');
+    const welcomeEl      = document.getElementById('welcome');
+    const errorToast     = document.getElementById('errorToast');
+    const logoutBtn      = document.getElementById('logoutBtn');
 
-    // ── Health check ─────────────────────────────────────────────────────────────
-    async function checkHealth() {
+    // ── Init ─────────────────────────────────────────────────────
+    if (token) {
+      showChat();
+    }
+
+    // ── Login ─────────────────────────────────────────────────────
+    loginBtn.addEventListener('click', doLogin);
+    loginPassword.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
+
+    async function doLogin() {
+      const user = loginUsername.value.trim();
+      const pass = loginPassword.value;
+
+      if (!user || !pass) {
+        showLoginError('Please enter your username and password');
+        return;
+      }
+
+      loginBtn.disabled = true;
+      loginBtn.textContent = 'AUTHENTICATING...';
+      loginError.classList.remove('visible');
+
       try {
-        const res = await fetch(`${API_BASE}/health`);
-        if (!res.ok) throw new Error();
-        statusDot.textContent = 'ONLINE';
-        statusDot.style.setProperty('--dot-color', 'var(--success)');
-      } catch {
-        statusDot.textContent = 'OFFLINE';
+        const res = await fetch(`${API_BASE}/auth/login`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ username: user, password: pass })
+        });
+
+        if (!res.ok) {
+          const err = await res.json().catch(() => ({}));
+          throw new Error(err.detail || 'Authentication failed');
+        }
+
+        const data = await res.json();
+        token       = data.token;
+        displayName = data.display_name;
+        username    = data.username;
+
+        sessionStorage.setItem('zoey_token', token);
+        sessionStorage.setItem('zoey_display_name', displayName);
+        sessionStorage.setItem('zoey_username', username);
+
+        showChat();
+
+      } catch (err) {
+        showLoginError(err.message || 'Authentication failed');
+      } finally {
+        loginBtn.disabled = false;
+        loginBtn.textContent = 'AUTHENTICATE';
       }
     }
 
-    checkHealth();
+    function showLoginError(msg) {
+      loginError.textContent = '⚠ ' + msg;
+      loginError.classList.add('visible');
+    }
 
-    // ── Auto-resize textarea ─────────────────────────────────────────────────────
+    function showChat() {
+      loginScreen.classList.add('hidden');
+      headerUsername.textContent = username.toUpperCase();
+      welcomeName.textContent    = displayName.split(' ')[0] || username;
+      loginPassword.value = '';
+    }
+
+    // ── Logout ────────────────────────────────────────────────────
+    logoutBtn.addEventListener('click', () => {
+      token = null;
+      sessionStorage.clear();
+      loginScreen.classList.remove('hidden');
+      loginError.classList.remove('visible');
+      loginUsername.value = '';
+      loginPassword.value = '';
+      // Clear chat messages
+      const msgs = messagesEl.querySelectorAll('.message');
+      msgs.forEach(m => m.remove());
+      welcomeEl.classList.remove('hidden');
+      welcomeShown = true;
+    });
+
+    // ── Chat ──────────────────────────────────────────────────────
     inputEl.addEventListener('input', () => {
       inputEl.style.height = 'auto';
       inputEl.style.height = Math.min(inputEl.scrollHeight, 140) + 'px';
     });
 
-    // ── Keyboard handler ─────────────────────────────────────────────────────────
-    inputEl.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter' && !e.shiftKey) {
-        e.preventDefault();
-        sendMessage();
-      }
+    inputEl.addEventListener('keydown', e => {
+      if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); sendMessage(); }
     });
 
     sendBtn.addEventListener('click', sendMessage);
 
-    // ── Send message ─────────────────────────────────────────────────────────────
     async function sendMessage() {
       const text = inputEl.value.trim();
-      if (!text || isLoading) return;
+      if (!text || isLoading || !token) return;
 
-      // Hide welcome
-      if (welcomeVisible) {
+      if (welcomeShown) {
         welcomeEl.classList.add('hidden');
-        welcomeVisible = false;
+        welcomeShown = false;
       }
 
-      // Add user bubble
       appendMessage('user', text, null);
-
-      // Clear input
       inputEl.value = '';
       inputEl.style.height = 'auto';
-
-      // Show typing indicator
       setLoading(true);
 
       const mode = modeToggle.checked ? 'advanced' : 'standard';
 
       try {
         const res = await fetch(`${API_BASE}/chat`, {
-          method:  'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body:    JSON.stringify({ message: text, session_id: SESSION_ID, mode })
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${token}`
+          },
+          body: JSON.stringify({ message: text, mode })
         });
+
+        if (res.status === 401) {
+          // Token expired — force re-login
+          sessionStorage.clear();
+          token = null;
+          loginScreen.classList.remove('hidden');
+          showLoginError('Session expired — please log in again');
+          return;
+        }
 
         if (!res.ok) {
           const err = await res.json().catch(() => ({}));
@@ -666,25 +792,25 @@
         }
 
         const data = await res.json();
-        appendMessage('zoey', data.reply, data.model_used);
+        appendMessage('zoey', data.reply, data.engine);
 
       } catch (err) {
-        showError(err.message || 'Could not reach Zoey. Is the backend running?');
+        showError(err.message || 'Could not reach Zoey');
       } finally {
         setLoading(false);
       }
     }
 
-    // ── Append a message bubble ──────────────────────────────────────────────────
-    function appendMessage(role, text, modelUsed) {
-      const isUser = role === 'user';
-      const initials = isUser ? 'B' : 'Z';
-      const timeStr = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    // ── Helpers ───────────────────────────────────────────────────
+    function appendMessage(role, text, engine) {
+      const isUser   = role === 'user';
+      const initials = isUser ? (username[0] || 'U').toUpperCase() : 'Z';
+      const timeStr  = new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
       let badgeHtml = '';
-      if (!isUser && modelUsed) {
-        const cls = modelUsed.includes('claude') ? 'claude' : 'mistral';
-        const label = modelUsed.includes('claude') ? 'CLAUDE' : 'MISTRAL';
+      if (!isUser && engine) {
+        const cls   = engine.includes('claude') ? 'claude' : 'ollama';
+        const label = engine.includes('claude') ? 'CLAUDE' : 'MIXTRAL';
         badgeHtml = `<span class="model-badge ${cls}">${label}</span>`;
       }
 
@@ -698,12 +824,10 @@
         </div>
       `;
 
-      // Insert before typing indicator
       messagesEl.insertBefore(div, typingEl);
       scrollToBottom();
     }
 
-    // ── Helpers ──────────────────────────────────────────────────────────────────
     function setLoading(state) {
       isLoading = state;
       sendBtn.disabled = state;
@@ -712,9 +836,7 @@
     }
 
     function scrollToBottom() {
-      requestAnimationFrame(() => {
-        messagesEl.scrollTop = messagesEl.scrollHeight;
-      });
+      requestAnimationFrame(() => { messagesEl.scrollTop = messagesEl.scrollHeight; });
     }
 
     function escapeHtml(str) {

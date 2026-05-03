@@ -86,8 +86,10 @@ REQUIRED_FILES=(
   "zoey_docker-compose.yml"
   "zoeycore/Dockerfile"
   "zoeycore/main.py"
+  "zoeycore/auth.py"
   "zoeycore/requirements.txt"
   "pwa/index.html"
+  
 )
 
 MISSING=0
@@ -136,7 +138,6 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
     warn "│                                                     │"
     warn "│  Required keys:                                     │"
     warn "│    ANTHROPIC_API_KEY                                │"
-    warn "│    MISTRAL_API_KEY                                  │"
     warn "│    MONGO_EXPRESS_PASSWORD                           │"
     warn "└─────────────────────────────────────────────────────┘"
     echo ""
@@ -163,8 +164,9 @@ chown -R root:docker "$INSTALL_DIR" 2>/dev/null || true
 chmod -R 750 "$INSTALL_DIR"
 chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
 chmod 044 "$INSTALL_DIR/.env.example" 2>/dev/null || true
-chown zoey:zoey /home/graystone/zoey/.env
-chmod 640 /home/graystone/zoey/.env
+chown zoey:zoey "$INSTALL_DIR/.env"
+chmod 640 $INSTALL_DIR/.env"
+chown -R 999:999 "$INSTALL_DIR/data/mongo"
 success "Permissions set"
 
 # ── Docker Build Phase ───────────────────────────────────────────────────
@@ -172,13 +174,18 @@ info "Building Docker images..."
 docker compose -f "$INSTALL_DIR/zoey_docker-compose.yml" build
 success "Docker images built"
 
+# ── Download Mistral Model ──────────────────────────────────────────────
+docker exec ollama ollama pull mixtral:8x7b
+
 # ── Create systemd service ────────────────────────────────────────
 info "Creating systemd service..."
 
 cat > /etc/systemd/system/zoey.service << EOF
+
+
 [Unit]
 Description=Zoey AI Assistant — Graystone Solutions
-Documentation=https://github.com/GraystoneSolutions/zoeygraystone/README.md
+Documentation=https://github.com/GraystoneSolutions/zoeygraystone
 After=network-online.target docker.service
 Wants=network-online.target
 Requires=docker.service
@@ -188,17 +195,21 @@ Type=oneshot
 RemainAfterExit=yes
 User=zoey
 Group=docker
-WorkingDirectory=${INSTALL_DIR}
+WorkingDirectory=/home/graystone/zoey
+
+# Give Docker time to fully initialize before starting the stack
+ExecStartPre=/bin/bash -c 'rm -f /home/graystone/zoey/data/mongo/mongod.lock /home/graystone/zoey/data/mongo/WiredTiger.lock'
+ExecStartPre=/bin/sleep 10
 
 # Start the stack
-ExecStart=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml up -d --build
+ExecStart=/usr/bin/docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up -d
 
 # Stop the stack
-ExecStop=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f /home/graystone/zoey/zoey_docker-compose.yml down
 
 # Restart policy
 Restart=on-failure
-RestartSec=10s
+RestartSec=15s
 
 # Logging
 StandardOutput=journal
@@ -208,7 +219,7 @@ SyslogIdentifier=zoey
 # Security hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=${INSTALL_DIR}
+ReadWritePaths=/home/graystone/zoey
 
 [Install]
 WantedBy=multi-user.target

@@ -1,0 +1,19 @@
+
+services:
+  ollama:
+    container_name: ollama
+    image: ollama/ollama:latest
+    restart: always
+    environment:
+      - TZ=America/Chicago
+    ports:
+      - "11434:11434"
+    volumes:
+      - ./data/ollama:/root/.ollama
+    networks:
+      - zoeynet
+
+networks:
+  zoeynet:
+    external: true
+    name: zoey_zoeynet
