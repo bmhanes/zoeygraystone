@@ -12,7 +12,7 @@ Future plans include several code modules which can be installed for interfacing
 For more information see: [Project Zoey](https://graystone.solutions/project_zoey)
 
 ## CURRENT ### 
-Phase 1: Local LLM and LDAP
+## Phase 1: Local LLM and LDAP
 Moved from Mistral API calls to local Mistral ollama with pull of LLM mixtral:8x7b
 Added support for LDAP Authentication to a local DC when testing in a local network
 
