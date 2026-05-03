@@ -1,14 +1,15 @@
-!/usr/bin/env bash
+#!/usr/bin/env bash
 # ═══════════════════════════════════════════════════════════════
 #  Zoey Bootstrap Script — Graystone Solutions
-#  Pull the latest build commit and sets up /home/graystone/zoey
+#  Pulls a specific GitHub commit and sets up /home/graystone/zoey
 # ═══════════════════════════════════════════════════════════════
 
 set -euo pipefail
 
 # ── Config ──────────────────────────────────────────────────────
-GITHUB_REPO="https://github.com/GraystoneSolutions/zoeygraystone.git"   # ← update if needed
+GITHUB_REPO="https://github.com/GraystoneSolutions/zoeygraystone.git"
 INSTALL_DIR="/home/graystone/zoey"
+SERVICE_USER="zoey"
 COMMIT="${1:-}"   # Pass commit hash as first argument
 
 # ── Colors ──────────────────────────────────────────────────────
@@ -33,7 +34,7 @@ echo -e "${NC}"
 
 # ── Require commit hash ──────────────────────────────────────────
 if [[ -z "$COMMIT" ]]; then
-  die "Usage: sudo $0 <commit-hash>\n       Example: sudo $0 master"
+  die "Usage: sudo $0 <commit-hash>\n       Example: sudo $0 a3f9c21"
 fi
 
 info "Target commit : ${BOLD}${COMMIT}${NC}"
@@ -46,18 +47,28 @@ for cmd in git docker; do
 done
 success "Dependencies found (git, docker)"
 
-# ── Create /home/graystone if needed ──────────────────────────────
+# ── Pre-flight: Install AppArmor ─────────────────────────────────
+info "Ensuring AppArmor is installed..."
+apt-get install -y apparmor apparmor-utils &>/dev/null
+systemctl restart apparmor
+success "AppArmor ready"
+
+# ── Create zoey service user if needed ───────────────────────────
+if ! id "$SERVICE_USER" &>/dev/null; then
+  info "Creating service user ${SERVICE_USER}..."
+  useradd --system --no-create-home --shell /usr/sbin/nologin "$SERVICE_USER"
+  usermod -aG docker "$SERVICE_USER"
+  success "Service user ${SERVICE_USER} created"
+else
+  success "Service user ${SERVICE_USER} already exists"
+fi
+
+# ── Create /home/graystone if needed ─────────────────────────────
 if [[ ! -d /home/graystone ]]; then
   info "Creating /home/graystone..."
   mkdir -p /home/graystone
+  chmod 755 /home/graystone
   success "Created /home/graystone"
-# ── Create Zoey User ───────────────────────────────────────────
-sudo useradd --system --no-create-home --shell /usr/sbin/nologin zoey
-sudo mkdir -p /home/graystone/zoey
-sudo chown -R zoey:zoey /home/graystone
-sudo chmod 750 /home/graystone/zoey
-sudo usermod -aG docker zoey
-
 fi
 
 # ── Handle existing install ───────────────────────────────────────
@@ -89,7 +100,6 @@ REQUIRED_FILES=(
   "zoeycore/auth.py"
   "zoeycore/requirements.txt"
   "pwa/index.html"
-  
 )
 
 MISSING=0
@@ -107,23 +117,12 @@ success "All required files present"
 
 # ── Create runtime directories ────────────────────────────────────
 info "Creating runtime directories..."
-chmod 755 /home/graystone
 mkdir -p \
   "$INSTALL_DIR/data/mongo" \
+  "$INSTALL_DIR/data/ollama" \
   "$INSTALL_DIR/logs" \
   "$INSTALL_DIR/backups"
 success "Runtime directories created"
-
-# ── Assign ownership to service user ─────────────────────────────
-info "Setting ownership to service user zoey..."
-chown -R "zoey":"zoey" "$INSTALL_DIR"
-chmod 750 "$INSTALL_DIR"
-chmod 755 \
-  "$INSTALL_DIR/data" \
-  "$INSTALL_DIR/data/mongo" \
-  "$INSTALL_DIR/logs" \
-  "$INSTALL_DIR/backups"
-success "Ownership set to user account zoey"
 
 # ── Set up .env if missing ────────────────────────────────────────
 if [[ ! -f "$INSTALL_DIR/.env" ]]; then
@@ -139,6 +138,8 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
     warn "│  Required keys:                                     │"
     warn "│    ANTHROPIC_API_KEY                                │"
     warn "│    MONGO_EXPRESS_PASSWORD                           │"
+    warn "│    JWT_SECRET                                       │"
+    warn "│    LDAP_SERVER / LDAP_DOMAIN / LDAP_BASE_DN         │"
     warn "└─────────────────────────────────────────────────────┘"
     echo ""
     read -rp "  Open .env in nano now to configure your API keys? [Y/n]: " open_confirm
@@ -147,7 +148,7 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
     fi
     echo ""
     # Verify the user actually edited the file — check for placeholder values
-    if grep -qE "your_.*_here|changeme" "$INSTALL_DIR/.env"; then
+    if grep -qE "your_.*_here|changeme|change_this" "$INSTALL_DIR/.env"; then
       warn "Placeholder values detected in .env — your API keys may not be set."
       read -rp "  Continue anyway? [y/N]: " force_confirm
       [[ "${force_confirm,,}" == "y" ]] || die "Halted. Edit ${INSTALL_DIR}/.env and re-run the script."
@@ -159,30 +160,53 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
 else
   success ".env already exists — skipping"
 fi
+
 # ── Permissions ───────────────────────────────────────────────────
+info "Setting permissions..."
 chown -R root:docker "$INSTALL_DIR" 2>/dev/null || true
 chmod -R 750 "$INSTALL_DIR"
-chmod 600 "$INSTALL_DIR/.env" 2>/dev/null || true
+chown "$SERVICE_USER":"$SERVICE_USER" "$INSTALL_DIR/.env"
+chmod 640 "$INSTALL_DIR/.env"
 chmod 044 "$INSTALL_DIR/.env.example" 2>/dev/null || true
-chown zoey:zoey "$INSTALL_DIR/.env"
-chmod 640 $INSTALL_DIR/.env"
+chmod 755 \
+  "$INSTALL_DIR/data" \
+  "$INSTALL_DIR/data/mongo" \
+  "$INSTALL_DIR/data/ollama" \
+  "$INSTALL_DIR/logs" \
+  "$INSTALL_DIR/backups"
 chown -R 999:999 "$INSTALL_DIR/data/mongo"
 success "Permissions set"
 
-# ── Docker Build Phase ───────────────────────────────────────────────────
-info "Building Docker images..."
-docker compose -f "$INSTALL_DIR/zoey_docker-compose.yml" build
-success "Docker images built"
+# ── Pre-flight: Clean stale MongoDB lock files ────────────────────
+info "Cleaning stale MongoDB lock files..."
+rm -f "$INSTALL_DIR/data/mongo/mongod.lock"
+rm -f "$INSTALL_DIR/data/mongo/WiredTiger.lock"
+success "MongoDB data directory clean"
 
-# ── Download Mistral Model ──────────────────────────────────────────────
-docker exec ollama ollama pull mixtral:8x7b
+# ── Install zoey_network_fix.sh ───────────────────────────────────
+if [[ -f "$INSTALL_DIR/Ubuntu24NetworkHotfixes/zoey_network_fix.sh" ]]; then
+  info "Installing network fix script..."
+  cp "$INSTALL_DIR/Ubuntu24NetworkHotfixes/zoey_network_fix.sh" /usr/local/bin/zoey_network_fix.sh
+  chmod +x /usr/local/bin/zoey_network_fix.sh
+  success "Network fix script installed to /usr/local/bin/"
+else
+  warn "zoey_network_fix.sh not found in repo — skipping"
+fi
+
+# ── Docker Build Phase ────────────────────────────────────────────
+info "Building Docker images..."
+docker compose -f "$INSTALL_DIR/zoey_docker-compose.yml" up --build -d
+success "Docker images built and stack started"
+
+# ── Apply nftables network rules ──────────────────────────────────
+info "Applying Zoey network rules..."
+bash /usr/local/bin/zoey_network_fix.sh
+success "Network rules applied"
 
 # ── Create systemd service ────────────────────────────────────────
 info "Creating systemd service..."
 
 cat > /etc/systemd/system/zoey.service << EOF
-
-
 [Unit]
 Description=Zoey AI Assistant — Graystone Solutions
 Documentation=https://github.com/GraystoneSolutions/zoeygraystone
@@ -193,19 +217,24 @@ Requires=docker.service
 [Service]
 Type=oneshot
 RemainAfterExit=yes
-User=zoey
+User=${SERVICE_USER}
 Group=docker
-WorkingDirectory=/home/graystone/zoey
+WorkingDirectory=${INSTALL_DIR}
 
-# Give Docker time to fully initialize before starting the stack
-ExecStartPre=/bin/bash -c 'rm -f /home/graystone/zoey/data/mongo/mongod.lock /home/graystone/zoey/data/mongo/WiredTiger.lock'
+# Clean stale MongoDB lock files before start
+ExecStartPre=/bin/bash -c 'rm -f ${INSTALL_DIR}/data/mongo/mongod.lock ${INSTALL_DIR}/data/mongo/WiredTiger.lock'
+
+# Give Docker time to fully initialize
 ExecStartPre=/bin/sleep 10
 
 # Start the stack
-ExecStart=/usr/bin/docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up -d
+ExecStart=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml up -d
+
+# Apply network rules after stack is up
+ExecStartPost=/bin/bash /usr/local/bin/zoey_network_fix.sh
 
 # Stop the stack
-ExecStop=/usr/bin/docker compose -f /home/graystone/zoey/zoey_docker-compose.yml down
+ExecStop=/usr/bin/docker compose -f ${INSTALL_DIR}/zoey_docker-compose.yml down
 
 # Restart policy
 Restart=on-failure
@@ -219,7 +248,7 @@ SyslogIdentifier=zoey
 # Security hardening
 NoNewPrivileges=yes
 ProtectSystem=strict
-ReadWritePaths=/home/graystone/zoey
+ReadWritePaths=${INSTALL_DIR}
 
 [Install]
 WantedBy=multi-user.target
@@ -227,22 +256,36 @@ EOF
 
 success "systemd unit file written to /etc/systemd/system/zoey.service"
 
-# ── Reload systemd and enable service ────────────────────────────
+# ── Install zoey-netfix systemd service ───────────────────────────
+if [[ -f "$INSTALL_DIR/Ubuntu24NetworkHotfixes/zoey-netfix.service" ]]; then
+  info "Installing zoey-netfix systemd service..."
+  cp "$INSTALL_DIR/Ubuntu24NetworkHotfixes/zoey-netfix.service" /etc/systemd/system/zoey-netfix.service
+  success "zoey-netfix.service installed"
+else
+  warn "zoey-netfix.service not found in repo — skipping"
+fi
+
+# ── Reload systemd and enable services ───────────────────────────
 info "Reloading systemd daemon..."
 systemctl daemon-reload
-success "systemd daemon reloaded"
-
-info "Enabling Zoey service to start on boot..."
 systemctl enable zoey.service
-success "Zoey service enabled"
+systemctl enable zoey-netfix.service 2>/dev/null || true
+success "Systemd services enabled"
+
+# ── Download Mixtral Model (last — takes significant time) ────────
+echo ""
+info "Pulling Mixtral 8x7b model (~26GB) — this will take a while..."
+warn "Monitor progress in another terminal with: docker logs ollama -f"
+docker exec ollama ollama pull mixtral:8x7b
+success "Mixtral model ready"
 
 # ── Offer to start the service now ───────────────────────────────
 echo ""
-read -rp "  Start Zoey now? [Y/n]: " start_confirm
+read -rp "  Start Zoey via systemd now? [Y/n]: " start_confirm
 if [[ "${start_confirm,,}" != "n" ]]; then
   info "Starting Zoey..."
   systemctl start zoey.service
-  sleep 3
+  sleep 5
   if systemctl is-active --quiet zoey.service; then
     success "Zoey is running"
   else
@@ -264,11 +307,15 @@ echo ""
 echo -e "  ${BOLD}Install path:${NC}  ${INSTALL_DIR}"
 echo -e "  ${BOLD}Commit:${NC}        ${COMMIT}"
 echo ""
-echo -e "  ${BOLD}Next steps:${NC}"
-echo -e "  ${CYAN}1.${NC}  Start Zoey:      ${BOLD}systemctl start zoey.service      # start${NC}"
-echo -e "  ${CYAN}2.${NC}  Stop Zoey:      ${BOLD}systemctl stop zoey.service       # stop${NC}"
-echo -e "  ${CYAN}3.${NC}  Restart Zoey:      ${BOLD}systemctl restart zoey.service    # restart${NC}"
-echo -e "  ${CYAN}4.${NC}  Check Status:      ${BOLD}systemctl status zoey.service     # health check${NC}"
-echo -e "  ${CYAN}5.${NC}  View Logs:      ${BOLD}journalctl -u zoey.service -f     # live logs${NC}"
-
+echo -e "  ${BOLD}Service commands:${NC}"
+echo -e "  ${CYAN}1.${NC}  Start:   ${BOLD}systemctl start zoey.service${NC}"
+echo -e "  ${CYAN}2.${NC}  Stop:    ${BOLD}systemctl stop zoey.service${NC}"
+echo -e "  ${CYAN}3.${NC}  Restart: ${BOLD}systemctl restart zoey.service${NC}"
+echo -e "  ${CYAN}4.${NC}  Status:  ${BOLD}systemctl status zoey.service${NC}"
+echo -e "  ${CYAN}5.${NC}  Logs:    ${BOLD}journalctl -u zoey.service -f${NC}"
+echo ""
+echo -e "  ${BOLD}Access points:${NC}"
+echo -e "  ${CYAN}•${NC}  Zoey PWA:    ${BOLD}http://10.242.1.1:8000${NC}"
+echo -e "  ${CYAN}•${NC}  API Docs:    ${BOLD}http://10.242.1.1:8000/docs${NC}"
+echo -e "  ${CYAN}•${NC}  MongoDB UI:  ${BOLD}http://10.242.1.1:8081${NC}"
 echo ""

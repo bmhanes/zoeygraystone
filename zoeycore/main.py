@@ -44,7 +44,7 @@ async def lifespan(app: FastAPI):
     logger.info("Zoey is shutting down")
 
 # ── App Setup ──────────────────────────────────────────────────────────────────
-app = FastAPI(title="Zoey AI", version="0.2.0", lifespan=lifespan)
+app = FastAPI(title="Zoey AI", version="1.0.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,

@@ -10,9 +10,9 @@ logger = logging.getLogger("zoey.auth")
 
 # ── Config ─────────────────────────────────────────────────────────────────────
 LDAP_SERVER   = os.environ.get("LDAP_SERVER",   "ldap://10.242.1.5")
-LDAP_DOMAIN   = os.environ.get("LDAP_DOMAIN",   "REDSTONE")
-LDAP_BASE_DN  = os.environ.get("LDAP_BASE_DN",  "DC=redstone,DC=local")
-ZOEY_AD_GROUP = os.environ.get("ZOEY_AD_GROUP", "zoey users")
+LDAP_DOMAIN   = os.environ.get("LDAP_DOMAIN",   "GRAYSTONE")
+LDAP_BASE_DN  = os.environ.get("LDAP_BASE_DN",  "DC=GRAYSTONE,DC=local")
+ZOEY_AD_GROUP = os.environ.get("ZOEY_AD_GROUP", "Zoey_Users")
 JWT_SECRET    = os.environ.get("JWT_SECRET",     "change_this_secret_in_env")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_H  = int(os.environ.get("JWT_EXPIRY_HOURS", "8"))
@@ -24,7 +24,7 @@ def is_zoey_user(groups: list) -> bool:
     """
     Check if the user is a member of the required AD group.
     Compares against the CN portion of each group's distinguished name.
-    Example DN: CN=Zoey Users,OU=Groups,DC=redstone,DC=local
+    Example DN: CN=Zoey Users,OU=Groups,DC=GRAYSTONE,DC=local
     """
     for group in groups:
         cn = group.split(',')[0].lower()  # grab just the CN portion
