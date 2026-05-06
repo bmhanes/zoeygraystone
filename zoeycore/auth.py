@@ -9,98 +9,127 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger("zoey.auth")
 
-# ── Config ─────────────────────────────────────────────────────────────────────
-AZURE_CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "")
-AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
-AZURE_TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "")
-AZURE_REDIRECT_URI  = os.environ.get("AZURE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+# ── Entra ID Config ────────────────────────────────────────────────────────────
+ENTRA_TENANT_ID     = os.environ.get("ENTRA_TENANT_ID",     "")
+ENTRA_CLIENT_ID     = os.environ.get("ENTRA_CLIENT_ID",     "")
+ENTRA_CLIENT_SECRET = os.environ.get("ENTRA_CLIENT_SECRET", "")
+ENTRA_AUTHORITY     = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}"
+ENTRA_REDIRECT_URI  = os.environ.get("ENTRA_REDIRECT_URI",  "http://localhost:8000/auth/callback")
+ENTRA_SCOPES        = [
+    "https://graph.microsoft.com/User.Read",
+    "https://graph.microsoft.com/GroupMember.Read.All"
+]
 ZOEY_AD_GROUP       = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
 
-AUTHORITY = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}"
-SCOPES    = ["User.Read"]
-
-JWT_SECRET    = os.environ.get("JWT_SECRET", "change_this_secret_in_env")
+# ── JWT Config ─────────────────────────────────────────────────────────────────
+JWT_SECRET    = os.environ.get("JWT_SECRET",      "change_this_secret_in_env")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_H  = int(os.environ.get("JWT_EXPIRY_HOURS", "8"))
 
 security = HTTPBearer()
 
-# ── MSAL ───────────────────────────────────────────────────────────────────────
-def _msal_app() -> msal.ConfidentialClientApplication:
+# ── MSAL Confidential Client ───────────────────────────────────────────────────
+def get_msal_app() -> msal.ConfidentialClientApplication:
     return msal.ConfidentialClientApplication(
-        AZURE_CLIENT_ID,
-        authority=AUTHORITY,
-        client_credential=AZURE_CLIENT_SECRET,
+        client_id=ENTRA_CLIENT_ID,
+        client_credential=ENTRA_CLIENT_SECRET,
+        authority=ENTRA_AUTHORITY
     )
 
-
-def get_auth_url() -> str:
-    """Return the Microsoft login URL to redirect the user to."""
-    return _msal_app().get_authorization_request_url(
-        scopes=SCOPES,
-        redirect_uri=AZURE_REDIRECT_URI,
+# ── Step 1: Generate Microsoft login URL ──────────────────────────────────────
+def get_auth_url(state: str = "") -> str:
+    """
+    Generate the Microsoft Entra ID authorization URL.
+    The PWA redirects the user to this URL to begin the OAuth2 flow.
+    """
+    app = get_msal_app()
+    auth_url = app.get_authorization_request_url(
+        scopes=ENTRA_SCOPES,
+        redirect_uri=ENTRA_REDIRECT_URI,
+        state=state
     )
+    return auth_url
 
-
-# ── Azure Authentication ───────────────────────────────────────────────────────
-async def authenticate_azure(code: str) -> dict:
+# ── Step 2: Exchange auth code for tokens ─────────────────────────────────────
+def exchange_code_for_token(code: str) -> dict:
     """
-    Exchange an Azure AD authorization code for tokens, fetch user profile
-    and group membership from Microsoft Graph, enforce zoey_users membership,
-    and return a user info dict on success.
+    Exchange the authorization code returned by Microsoft for an access token.
+    Called by the /auth/callback endpoint after Microsoft redirects back.
     """
-    result = _msal_app().acquire_token_by_authorization_code(
-        code,
-        scopes=SCOPES,
-        redirect_uri=AZURE_REDIRECT_URI,
+    app = get_msal_app()
+    result = app.acquire_token_by_authorization_code(
+        code=code,
+        scopes=ENTRA_SCOPES,
+        redirect_uri=ENTRA_REDIRECT_URI
     )
 
     if "error" in result:
-        logger.error(f"Azure token exchange failed: {result.get('error_description')}")
-        raise HTTPException(status_code=401, detail="Azure authentication failed")
+        logger.error(f"Token exchange failed: {result.get('error_description')}")
+        raise HTTPException(status_code=401, detail="Authentication failed")
 
-    access_token = result["access_token"]
+    return result
+
+# ── Step 3: Get user profile and validate group membership ────────────────────
+def get_user_profile(access_token: str) -> dict:
+    """
+    Use the Microsoft Graph API to retrieve user profile and group memberships.
+    Enforces zoey_users group membership.
+    """
     headers = {"Authorization": f"Bearer {access_token}"}
 
-    async with httpx.AsyncClient(timeout=10.0) as client:
-        me_resp = await client.get("https://graph.microsoft.com/v1.0/me", headers=headers)
-        if me_resp.status_code != 200:
-            logger.error(f"Graph /me error {me_resp.status_code}: {me_resp.text}")
-            raise HTTPException(status_code=503, detail="Failed to retrieve user profile")
-        me = me_resp.json()
+    try:
+        with httpx.Client(timeout=10.0) as client:
+            # Get user profile
+            profile_resp = client.get(
+                "https://graph.microsoft.com/v1.0/me",
+                headers=headers
+            )
+            profile_resp.raise_for_status()
+            profile = profile_resp.json()
 
-        groups_resp = await client.get(
-            "https://graph.microsoft.com/v1.0/me/memberOf?$select=displayName",
-            headers=headers,
-        )
-        if groups_resp.status_code != 200:
-            logger.error(f"Graph /memberOf error {groups_resp.status_code}: {groups_resp.text}")
-            raise HTTPException(status_code=503, detail="Failed to retrieve group membership")
-        group_names = [g.get("displayName", "") for g in groups_resp.json().get("value", [])]
+            # Get group memberships
+            groups_resp = client.get(
+                "https://graph.microsoft.com/v1.0/me/memberOf",
+                headers=headers
+            )
+            groups_resp.raise_for_status()
+            groups_data = groups_resp.json()
 
-    upn      = me.get("userPrincipalName", "")
-    username = upn.split("@")[0].lower()
+    except httpx.HTTPError as e:
+        logger.error(f"Graph API error: {e}")
+        raise HTTPException(status_code=503, detail="Could not retrieve user profile")
 
-    if ZOEY_AD_GROUP not in group_names:
-        logger.warning(f"Access denied for {upn} — not in '{ZOEY_AD_GROUP}'")
-        raise HTTPException(
-            status_code=403,
-            detail="Access denied — your account is not authorized for Zoey",
-        )
+    # Build group name list
+    group_names = [
+        g.get("displayName", "").lower()
+        for g in groups_data.get("value", [])
+        if g.get("@odata.type") == "#microsoft.graph.group"
+    ]
 
     user = {
-        "username":     username,
-        "upn":          upn,
-        "display_name": me.get("displayName", ""),
-        "email":        me.get("mail") or upn,
-        "department":   me.get("department", ""),
-        "title":        me.get("jobTitle", ""),
-        "groups":       group_names,
+        "username":     profile.get("userPrincipalName", "").split("@")[0],
+        "upn":          profile.get("userPrincipalName", ""),
+        "display_name": profile.get("displayName", ""),
+        "email":        profile.get("mail") or profile.get("userPrincipalName", ""),
+        "department":   profile.get("department", ""),
+        "title":        profile.get("jobTitle", ""),
+        "groups":       group_names
     }
 
-    logger.info(f"Access granted: {user['display_name']} ({upn})")
-    return user
+    logger.info(f"User profile retrieved: {user['display_name']} ({user['upn']})")
 
+    # Enforce zoey_users group membership
+    if ZOEY_AD_GROUP.lower() not in group_names:
+        logger.warning(
+            f"Access denied for {user['upn']} — not a member of '{ZOEY_AD_GROUP}'"
+        )
+        raise HTTPException(
+            status_code=403,
+            detail="Access denied — your account is not authorized for Zoey"
+        )
+
+    logger.info(f"Access granted: {user['display_name']} ({user['upn']})")
+    return user
 
 # ── JWT Token ──────────────────────────────────────────────────────────────────
 def create_jwt(user: dict) -> str:
@@ -113,7 +142,7 @@ def create_jwt(user: dict) -> str:
         "department":   user["department"],
         "title":        user["title"],
         "iat":          datetime.now(timezone.utc),
-        "exp":          datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_H),
+        "exp":          datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_H)
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -121,11 +150,12 @@ def create_jwt(user: dict) -> str:
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """
     FastAPI dependency — validates Bearer token on protected routes.
-    Returns decoded payload on success.
+    Returns decoded payload (user info) on success.
     """
     token = credentials.credentials
     try:
-        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
+        return payload
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired — please log in again")
     except jwt.InvalidTokenError:

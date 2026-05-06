@@ -1,4 +1,5 @@
-from fastapi import FastAPI, HTTPException, Depends, Security
+from fastapi import FastAPI, HTTPException, Depends, Request
+from fastapi.responses import RedirectResponse, JSONResponse
 from fastapi.staticfiles import StaticFiles
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
@@ -7,9 +8,7 @@ from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from auth import authenticate_azure, create_jwt, verify_jwt, get_auth_url
-from fastapi.responses import RedirectResponse
-from urllib.parse import urlencode
+from auth import get_auth_url, exchange_code_for_token, get_user_profile, create_jwt, verify_jwt
 import httpx
 import logging
 import os
@@ -46,7 +45,7 @@ async def lifespan(app: FastAPI):
     logger.info("Zoey is shutting down")
 
 # ── App Setup ──────────────────────────────────────────────────────────────────
-app = FastAPI(title="Zoey AI", version="1.0.0", lifespan=lifespan)
+app = FastAPI(title="Zoey AI", version="0.3.0", lifespan=lifespan)
 
 app.add_middleware(
     CORSMiddleware,
@@ -57,26 +56,26 @@ app.add_middleware(
 
 # ── API Clients ────────────────────────────────────────────────────────────────
 anthropic_client = Anthropic(api_key=os.environ["ANTHROPIC_API_KEY"])
-OLLAMA_URL       = os.environ.get("OLLAMA_URL", "http://ollama:11434")
+MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY", "")
+OLLAMA_URL       = os.environ.get("OLLAMA_URL", "")
 OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "mixtral:8x7b")
 
-# ── DB (set during lifespan) ───────────────────────────────────────────────────
+# ── DB ─────────────────────────────────────────────────────────────────────────
 db = None
 
 # ── System Prompt ──────────────────────────────────────────────────────────────
-ZOEY_SYSTEM_PROMPT = """You are Zoey Graystone, an intelligent AI assistant built for 
-Graystone Solutions. You are helpful, professional, and security-minded. 
-You assist with research, tooling, and general life tasks. 
-Be concise but thorough. If you are unsure about something, say so. 
+ZOEY_SYSTEM_PROMPT = """You are Zoey Graystone, an intelligent AI assistant built for
+Graystone Solutions. You are helpful, professional, and security-minded.
+You assist with research, tooling, and general life tasks.
+Be concise but thorough. If you are unsure about something, say so.
 Always prioritize user privacy and data security.
-You will be told who you are speaking with at the start of each session. 
+You will be told who you are speaking with at the start of each session.
 Use their name naturally and remember context about them."""
 
 # ── Models ────────────────────────────────────────────────────────────────────
-
 class ChatRequest(BaseModel):
     message: str
-    mode: str = "standard"   # "standard" = Ollama/Mixtral | "advanced" = Claude
+    mode: str = "standard"   # "standard" = Mistral API | "advanced" = Claude
 
 class ChatResponse(BaseModel):
     model_config = {'protected_namespaces': ()}
@@ -85,7 +84,6 @@ class ChatResponse(BaseModel):
 
 # ── Helpers ────────────────────────────────────────────────────────────────────
 def get_user_collections(username: str):
-    """Return MongoDB collections scoped to a specific user."""
     return {
         "conversations": db[f"{username}.conversations"],
         "memory":        db[f"{username}.memory"],
@@ -103,8 +101,7 @@ def get_conversation_history(username: str, limit: int = 20) -> list:
     return list(reversed(history))
 
 def build_user_context(username: str, display_name: str) -> str:
-    """Build a context string from what Zoey knows about this user."""
-    cols = get_user_collections(username)
+    cols  = get_user_collections(username)
     prefs = cols["preferences"].find_one({}, {"_id": 0}) or {}
     mem   = list(cols["memory"].find({}, {"_id": 0, "fact": 1}).limit(10))
     facts = " ".join([m["fact"] for m in mem]) if mem else ""
@@ -115,47 +112,72 @@ def build_user_context(username: str, display_name: str) -> str:
         context += f" Preferences: {prefs}"
     return context
 
-# ── Routes ─────────────────────────────────────────────────────────────────────
-@app.get("/health")
-def health_check():
-    return {"status": "online", "assistant": "Zoey", "version": "0.2.0"}
-
-
+# ── Auth Routes ────────────────────────────────────────────────────────────────
 @app.get("/auth/login")
 def login():
-    """Redirect the browser to Microsoft's login page."""
-    return RedirectResponse(get_auth_url())
+    """Redirect user to Microsoft login page."""
+    auth_url = get_auth_url()
+    return RedirectResponse(url=auth_url)
 
 
 @app.get("/auth/callback")
-async def auth_callback(code: str = None, error: str = None, error_description: str = None):
-    """Receive the Azure AD authorization code, exchange it, and redirect the PWA with a token."""
+async def auth_callback(request: Request):
+    """
+    Handle the OAuth2 callback from Microsoft.
+    Exchanges the auth code for tokens, validates group membership,
+    and returns a Zoey JWT.
+    """
+    code  = request.query_params.get("code")
+    error = request.query_params.get("error")
+
     if error:
-        logger.warning(f"Azure auth error: {error} — {error_description}")
-        params = urlencode({"auth_error": error_description or error})
-        return RedirectResponse(f"/#?{params}")
+        logger.error(f"OAuth2 error: {error} — {request.query_params.get('error_description')}")
+        return RedirectResponse(url="/?error=auth_failed")
 
     if not code:
-        return RedirectResponse("/#?auth_error=missing_code")
+        raise HTTPException(status_code=400, detail="No authorization code received")
 
-    user  = await authenticate_azure(code)
-    token = create_jwt(user)
+    # Exchange code for Microsoft access token
+    token_result = exchange_code_for_token(code)
+    access_token = token_result["access_token"]
 
+    # Get user profile and validate group membership
+    user = get_user_profile(access_token)
+
+    # Upsert user record in MongoDB
     db["users"].update_one(
         {"username": user["username"]},
         {"$set": {**user, "last_seen": datetime.now(timezone.utc)}},
-        upsert=True,
+        upsert=True
     )
 
-    logger.info(f"Login: {user['display_name']} ({user['username']})")
-    params = urlencode({
-        "token":        token,
-        "display_name": user["display_name"],
-        "username":     user["username"],
-    })
-    return RedirectResponse(f"/#?{params}")
+    # Issue Zoey JWT
+    zoey_token = create_jwt(user)
+
+    logger.info(f"Login: {user['display_name']} ({user['upn']})")
+
+    # Redirect to PWA with token in URL fragment
+    # The PWA reads the token from the URL and stores it in sessionStorage
+    return RedirectResponse(
+        url=f"/?token={zoey_token}&display_name={user['display_name']}&username={user['username']}"
+    )
 
 
+@app.get("/auth/logout")
+def logout():
+    """Redirect to Microsoft logout."""
+    tenant_id = os.environ.get("ENTRA_TENANT_ID", "")
+    logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri=/"
+    return RedirectResponse(url=logout_url)
+
+
+# ── Health ─────────────────────────────────────────────────────────────────────
+@app.get("/health")
+def health_check():
+    return {"status": "online", "assistant": "Zoey", "version": "0.3.0"}
+
+
+# ── Chat ───────────────────────────────────────────────────────────────────────
 @app.post("/chat", response_model=ChatResponse)
 async def chat(req: ChatRequest, user: dict = Depends(verify_jwt)):
     username     = user["sub"]
@@ -169,8 +191,8 @@ async def chat(req: ChatRequest, user: dict = Depends(verify_jwt)):
         logger.error(f"MongoDB read error: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
-    # Build user context for system prompt
-    user_context = build_user_context(username, display_name)
+    # Build system prompt with user context
+    user_context  = build_user_context(username, display_name)
     system_prompt = f"{ZOEY_SYSTEM_PROMPT}\n\n{user_context}"
 
     # Build messages
@@ -193,7 +215,7 @@ async def chat(req: ChatRequest, user: dict = Depends(verify_jwt)):
         if req.mode == "advanced":
             # Claude for complex reasoning
             response = anthropic_client.messages.create(
-                model="claude-sonnet-4-20250514",
+                model="claude-sonnet-4-5-20250929",
                 max_tokens=2048,
                 system=system_prompt,
                 messages=messages
@@ -201,21 +223,32 @@ async def chat(req: ChatRequest, user: dict = Depends(verify_jwt)):
             reply  = response.content[0].text
             engine = "claude-sonnet"
 
-        else:
-            # Local Mixtral via Ollama
+        elif OLLAMA_URL:
+            # Local Ollama if available
             ollama_messages = [{"role": "system", "content": system_prompt}] + messages
-            async with httpx.AsyncClient(timeout=120.0) as client:
+            async with httpx.AsyncClient(timeout=600.0) as client:
                 response = await client.post(
                     f"{OLLAMA_URL}/api/chat",
-                    json={
-                        "model":    OLLAMA_MODEL,
-                        "messages": ollama_messages,
-                        "stream":   False
-                    }
+                    json={"model": OLLAMA_MODEL, "messages": ollama_messages, "stream": False}
                 )
                 response.raise_for_status()
                 reply  = response.json()["message"]["content"]
                 engine = f"ollama/{OLLAMA_MODEL}"
+
+        else:
+            # Mistral API
+            async with httpx.AsyncClient(timeout=60.0) as client:
+                response = await client.post(
+                    "https://api.mistral.ai/v1/chat/completions",
+                    headers={"Authorization": f"Bearer {MISTRAL_API_KEY}"},
+                    json={
+                        "model": "mistral-small-latest",
+                        "messages": [{"role": "system", "content": system_prompt}] + messages
+                    }
+                )
+                response.raise_for_status()
+                reply  = response.json()["choices"][0]["message"]["content"]
+                engine = "mistral-small"
 
     except Exception as e:
         logger.error(f"AI API error: {e}")
@@ -258,18 +291,14 @@ def clear_history(user: dict = Depends(verify_jwt)):
 
 @app.post("/memory")
 def save_memory(fact: dict, user: dict = Depends(verify_jwt)):
-    """Save a fact about the user to Zoey's memory."""
     try:
         cols = get_user_collections(user["sub"])
-        cols["memory"].insert_one({
-            **fact,
-            "timestamp": datetime.now(timezone.utc)
-        })
+        cols["memory"].insert_one({**fact, "timestamp": datetime.now(timezone.utc)})
         return {"saved": True}
     except Exception as e:
         logger.error(f"MongoDB memory write error: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
 
-# ── Serve PWA static files ─────────────────────────────────────────────────────
+# ── Serve PWA ──────────────────────────────────────────────────────────────────
 app.mount("/", StaticFiles(directory="/zoey/pwa", html=True), name="pwa")

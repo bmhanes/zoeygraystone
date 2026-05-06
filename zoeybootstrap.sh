@@ -139,7 +139,10 @@ if [[ ! -f "$INSTALL_DIR/.env" ]]; then
     warn "│    ANTHROPIC_API_KEY                                │"
     warn "│    MONGO_EXPRESS_PASSWORD                           │"
     warn "│    JWT_SECRET                                       │"
-    warn "│    LDAP_SERVER / LDAP_DOMAIN / LDAP_BASE_DN         │"
+    warn "│    AZURE_TENANT_ID                                  │"
+    warn "│    AZURE_CLIENT_ID                                  │"
+    warn "│    AZURE_CLIENT_SECRET                              │"
+    warn "│    MISTRAL_API_KEY                                  │"    
     warn "└─────────────────────────────────────────────────────┘"
     echo ""
     read -rp "  Open .env in nano now to configure your API keys? [Y/n]: " open_confirm
@@ -198,10 +201,14 @@ info "Building Docker images..."
 docker compose -f "$INSTALL_DIR/zoey_docker-compose.yml" up --build -d
 success "Docker images built and stack started"
 
-# ── Apply nftables network rules ──────────────────────────────────
-info "Applying Zoey network rules..."
-bash /usr/local/bin/zoey_network_fix.sh
-success "Network rules applied"
+# ── Apply nftables network rules (Ubuntu 24.04 / Docker 29.x only) ──
+if [[ -f "/usr/local/bin/zoey_network_fix.sh" ]]; then
+    info "Applying Zoey network rules..."
+    bash /usr/local/bin/zoey_network_fix.sh
+    success "Network rules applied"
+else
+    info "Network fix script not found — skipping (not required on Azure/AKS)"
+fi
 
 # ── Create systemd service ────────────────────────────────────────
 info "Creating systemd service..."
@@ -274,10 +281,13 @@ success "Systemd services enabled"
 
 # ── Download Mixtral Model (last — takes significant time) ────────
 echo ""
-info "Pulling Mixtral 8x7b model (~26GB) — this will take a while..."
-warn "Monitor progress in another terminal with: docker logs ollama -f"
-docker exec ollama ollama pull mixtral:8x7b
-success "Mixtral model ready"
+# Only pull if Ollama container exists
+if docker ps | grep -q ollama; then
+    info "Pulling Mixtral 8x7b model (~26GB) — this will take a while..."
+    warn "Monitor progress in another terminal with: docker logs ollama -f"
+    docker exec ollama ollama pull mixtral:8x7b
+    success "Mixtral model ready"
+fi
 
 # ── Offer to start the service now ───────────────────────────────
 echo ""
