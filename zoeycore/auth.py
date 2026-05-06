@@ -9,153 +9,96 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger("zoey.auth")
 
-# ── Entra ID Config ────────────────────────────────────────────────────────────
-ENTRA_TENANT_ID   = os.environ.get("ENTRA_TENANT_ID",   "")
-ENTRA_CLIENT_ID   = os.environ.get("ENTRA_CLIENT_ID",   "")
-ENTRA_CLIENT_SECRET = os.environ.get("ENTRA_CLIENT_SECRET", "")
-ENTRA_AUTHORITY   = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}"
-ENTRA_SCOPE       = ["https://graph.microsoft.com/.default"]
-ZOEY_AD_GROUP     = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
+# ── Config ─────────────────────────────────────────────────────────────────────
+AZURE_CLIENT_ID     = os.environ.get("AZURE_CLIENT_ID", "")
+AZURE_CLIENT_SECRET = os.environ.get("AZURE_CLIENT_SECRET", "")
+AZURE_TENANT_ID     = os.environ.get("AZURE_TENANT_ID", "")
+AZURE_REDIRECT_URI  = os.environ.get("AZURE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+ZOEY_AD_GROUP       = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
 
-# ── JWT Config ─────────────────────────────────────────────────────────────────
-JWT_SECRET    = os.environ.get("JWT_SECRET",      "change_this_secret_in_env")
+AUTHORITY = f"https://login.microsoftonline.com/{AZURE_TENANT_ID}"
+SCOPES    = ["User.Read"]
+
+JWT_SECRET    = os.environ.get("JWT_SECRET", "change_this_secret_in_env")
 JWT_ALGORITHM = "HS256"
 JWT_EXPIRY_H  = int(os.environ.get("JWT_EXPIRY_HOURS", "8"))
 
 security = HTTPBearer()
 
-# ── MSAL Confidential Client ───────────────────────────────────────────────────
-def get_msal_app():
+# ── MSAL ───────────────────────────────────────────────────────────────────────
+def _msal_app() -> msal.ConfidentialClientApplication:
     return msal.ConfidentialClientApplication(
-        client_id=ENTRA_CLIENT_ID,
-        client_credential=ENTRA_CLIENT_SECRET,
-        authority=ENTRA_AUTHORITY
+        AZURE_CLIENT_ID,
+        authority=AUTHORITY,
+        client_credential=AZURE_CLIENT_SECRET,
     )
 
-# ── Get Graph API token (service account equivalent) ──────────────────────────
-def get_graph_token() -> str:
-    """Acquire a token for Microsoft Graph API using client credentials."""
-    app = get_msal_app()
-    result = app.acquire_token_silent(ENTRA_SCOPE, account=None)
-    if not result:
-        result = app.acquire_token_for_client(scopes=ENTRA_SCOPE)
-    if "access_token" not in result:
-        logger.error(f"Failed to acquire Graph token: {result.get('error_description')}")
-        raise HTTPException(status_code=503, detail="Authentication service unavailable")
-    return result["access_token"]
 
-# ── Validate user credentials via ROPC flow ────────────────────────────────────
-def authenticate_entra(username: str, password: str) -> dict:
+def get_auth_url() -> str:
+    """Return the Microsoft login URL to redirect the user to."""
+    return _msal_app().get_authorization_request_url(
+        scopes=SCOPES,
+        redirect_uri=AZURE_REDIRECT_URI,
+    )
+
+
+# ── Azure Authentication ───────────────────────────────────────────────────────
+async def authenticate_azure(code: str) -> dict:
     """
-    Authenticate a user against Entra ID using Resource Owner Password Credentials.
-    
-    Flow:
-    1. Authenticate user credentials via ROPC
-    2. Acquire Graph API token via client credentials
-    3. Look up user profile and group memberships
-    4. Enforce zoey_users group membership
-    5. Return user info dict on success
-    
-    Note: ROPC requires the Entra ID app to have ROPC enabled and
-    'Allow public client flows' turned on in the app registration.
+    Exchange an Azure AD authorization code for tokens, fetch user profile
+    and group membership from Microsoft Graph, enforce zoey_users membership,
+    and return a user info dict on success.
     """
-    if not username or not password:
-        raise HTTPException(status_code=400, detail="Username and password required")
+    result = _msal_app().acquire_token_by_authorization_code(
+        code,
+        scopes=SCOPES,
+        redirect_uri=AZURE_REDIRECT_URI,
+    )
 
-    # Normalize UPN
-    if "@" not in username:
-        upn = f"{username}@graystone.solutions"
-    else:
-        upn = username.lower()
+    if "error" in result:
+        logger.error(f"Azure token exchange failed: {result.get('error_description')}")
+        raise HTTPException(status_code=401, detail="Azure authentication failed")
 
-    # ── Step 1: Authenticate user via ROPC ────────────────────────────────────
-    try:
-        app = get_msal_app()
-        result = app.acquire_token_by_username_password(
-            username=upn,
-            password=password,
-            scopes=["https://graph.microsoft.com/User.Read",
-                    "https://graph.microsoft.com/GroupMember.Read.All"]
+    access_token = result["access_token"]
+    headers = {"Authorization": f"Bearer {access_token}"}
+
+    async with httpx.AsyncClient(timeout=10.0) as client:
+        me_resp = await client.get("https://graph.microsoft.com/v1.0/me", headers=headers)
+        if me_resp.status_code != 200:
+            logger.error(f"Graph /me error {me_resp.status_code}: {me_resp.text}")
+            raise HTTPException(status_code=503, detail="Failed to retrieve user profile")
+        me = me_resp.json()
+
+        groups_resp = await client.get(
+            "https://graph.microsoft.com/v1.0/me/memberOf?$select=displayName",
+            headers=headers,
         )
+        if groups_resp.status_code != 200:
+            logger.error(f"Graph /memberOf error {groups_resp.status_code}: {groups_resp.text}")
+            raise HTTPException(status_code=503, detail="Failed to retrieve group membership")
+        group_names = [g.get("displayName", "") for g in groups_resp.json().get("value", [])]
 
-        if "error" in result:
-            error = result.get("error")
-            desc  = result.get("error_description", "")
-            logger.warning(f"Auth failed for {upn}: {error} — {desc}")
+    upn      = me.get("userPrincipalName", "")
+    username = upn.split("@")[0].lower()
 
-            if "AADSTS50126" in desc:
-                raise HTTPException(status_code=401, detail="Invalid username or password")
-            elif "AADSTS50057" in desc:
-                raise HTTPException(status_code=401, detail="Account is disabled")
-            elif "AADSTS50076" in desc:
-                raise HTTPException(status_code=401, detail="MFA required — use the web login flow")
-            else:
-                raise HTTPException(status_code=401, detail="Authentication failed")
-
-        user_token = result["access_token"]
-        logger.info(f"ROPC authentication successful for {upn}")
-
-    except HTTPException:
-        raise
-    except Exception as e:
-        logger.error(f"MSAL error: {e}")
-        raise HTTPException(status_code=503, detail="Authentication service error")
-
-    # ── Step 2: Get user profile from Graph API ───────────────────────────────
-    try:
-        headers = {"Authorization": f"Bearer {user_token}"}
-
-        with httpx.Client(timeout=10.0) as client:
-            # Get user profile
-            profile_resp = client.get(
-                "https://graph.microsoft.com/v1.0/me",
-                headers=headers
-            )
-            profile_resp.raise_for_status()
-            profile = profile_resp.json()
-
-            # Get group memberships
-            groups_resp = client.get(
-                "https://graph.microsoft.com/v1.0/me/memberOf",
-                headers=headers
-            )
-            groups_resp.raise_for_status()
-            groups_data = groups_resp.json()
-
-    except httpx.HTTPError as e:
-        logger.error(f"Graph API error: {e}")
-        raise HTTPException(status_code=503, detail="Could not retrieve user profile")
-
-    # ── Step 3: Build user dict ───────────────────────────────────────────────
-    group_names = [
-        g.get("displayName", "").lower()
-        for g in groups_data.get("value", [])
-        if g.get("@odata.type") == "#microsoft.graph.group"
-    ]
-
-    user = {
-        "username":     profile.get("userPrincipalName", upn).split("@")[0],
-        "upn":          profile.get("userPrincipalName", upn),
-        "display_name": profile.get("displayName", upn),
-        "email":        profile.get("mail") or profile.get("userPrincipalName", upn),
-        "department":   profile.get("department", ""),
-        "title":        profile.get("jobTitle", ""),
-        "groups":       group_names
-    }
-
-    logger.info(f"User profile retrieved: {user['display_name']} ({user['upn']})")
-
-    # ── Step 4: Enforce zoey_users group membership ───────────────────────────
-    if ZOEY_AD_GROUP.lower() not in group_names:
-        logger.warning(
-            f"Access denied for {upn} — not a member of '{ZOEY_AD_GROUP}'"
-        )
+    if ZOEY_AD_GROUP not in group_names:
+        logger.warning(f"Access denied for {upn} — not in '{ZOEY_AD_GROUP}'")
         raise HTTPException(
             status_code=403,
-            detail="Access denied — your account is not authorized for Zoey"
+            detail="Access denied — your account is not authorized for Zoey",
         )
 
-    logger.info(f"Access granted: {user['display_name']} ({user['upn']})")
+    user = {
+        "username":     username,
+        "upn":          upn,
+        "display_name": me.get("displayName", ""),
+        "email":        me.get("mail") or upn,
+        "department":   me.get("department", ""),
+        "title":        me.get("jobTitle", ""),
+        "groups":       group_names,
+    }
+
+    logger.info(f"Access granted: {user['display_name']} ({upn})")
     return user
 
 
@@ -170,7 +113,7 @@ def create_jwt(user: dict) -> str:
         "department":   user["department"],
         "title":        user["title"],
         "iat":          datetime.now(timezone.utc),
-        "exp":          datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_H)
+        "exp":          datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_H),
     }
     return jwt.encode(payload, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -178,12 +121,11 @@ def create_jwt(user: dict) -> str:
 def verify_jwt(credentials: HTTPAuthorizationCredentials = Security(security)) -> dict:
     """
     FastAPI dependency — validates Bearer token on protected routes.
-    Returns decoded payload (user info) on success.
+    Returns decoded payload on success.
     """
     token = credentials.credentials
     try:
-        payload = jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
-        return payload
+        return jwt.decode(token, JWT_SECRET, algorithms=[JWT_ALGORITHM])
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Session expired — please log in again")
     except jwt.InvalidTokenError:

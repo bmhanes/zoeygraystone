@@ -120,38 +120,6 @@
       margin-bottom: 32px;
     }
 
-    .login-field {
-      margin-bottom: 16px;
-    }
-
-    .login-field label {
-      display: block;
-      font-family: var(--font-mono);
-      font-size: 10px;
-      color: var(--text-dim);
-      letter-spacing: 0.08em;
-      margin-bottom: 8px;
-    }
-
-    .login-field input {
-      width: 100%;
-      background: var(--surface2);
-      border: 1px solid var(--border);
-      border-radius: var(--radius);
-      color: var(--text);
-      font-family: var(--font-ui);
-      font-size: 14px;
-      padding: 12px 16px;
-      outline: none;
-      transition: border-color var(--transition), box-shadow var(--transition);
-    }
-
-    .login-field input::placeholder { color: var(--text-dim); }
-
-    .login-field input:focus {
-      border-color: var(--accent);
-      box-shadow: 0 0 0 3px rgba(0, 212, 255, 0.1);
-    }
 
     .login-btn {
       width: 100%;
@@ -565,16 +533,7 @@
       <div class="login-title">Welcome to <span>Zoey</span></div>
       <div class="login-sub">GRAYSTONE SOLUTIONS · AUTHORIZED ACCESS ONLY</div>
 
-      <div class="login-field">
-        <label>GRAYSTONE USERNAME</label>
-        <input type="text" id="loginUsername" placeholder="username" autocomplete="username" autocapitalize="none" />
-      </div>
-      <div class="login-field">
-        <label>PASSWORD</label>
-        <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
-      </div>
-
-      <button class="login-btn" id="loginBtn">AUTHENTICATE</button>
+      <button class="login-btn" id="loginBtn">SIGN IN WITH MICROSOFT</button>
       <div class="login-error" id="loginError"></div>
       <div class="login-notice">ACCESS RESTRICTED TO AUTHORIZED GRAYSTONE PERSONNEL</div>
     </div>
@@ -644,8 +603,6 @@
 
     // ── Elements ─────────────────────────────────────────────────
     const loginScreen    = document.getElementById('loginScreen');
-    const loginUsername  = document.getElementById('loginUsername');
-    const loginPassword  = document.getElementById('loginPassword');
     const loginBtn       = document.getElementById('loginBtn');
     const loginError     = document.getElementById('loginError');
     const headerUsername = document.getElementById('headerUsername');
@@ -659,58 +616,36 @@
     const errorToast     = document.getElementById('errorToast');
     const logoutBtn      = document.getElementById('logoutBtn');
 
-    // ── Init ─────────────────────────────────────────────────────
+    // ── Init — check for Azure callback token in URL hash ─────────
+    (function handleCallback() {
+      const hash = window.location.hash.slice(1);
+      if (!hash) return;
+      const params = new URLSearchParams(hash.startsWith('?') ? hash.slice(1) : hash);
+      const cbToken = params.get('token');
+      const cbError = params.get('auth_error');
+      history.replaceState(null, '', window.location.pathname);
+      if (cbError) {
+        showLoginError(cbError);
+        return;
+      }
+      if (cbToken) {
+        token       = cbToken;
+        displayName = params.get('display_name') || '';
+        username    = params.get('username') || '';
+        sessionStorage.setItem('zoey_token', token);
+        sessionStorage.setItem('zoey_display_name', displayName);
+        sessionStorage.setItem('zoey_username', username);
+      }
+    })();
+
     if (token) {
       showChat();
     }
 
     // ── Login ─────────────────────────────────────────────────────
-    loginBtn.addEventListener('click', doLogin);
-    loginPassword.addEventListener('keydown', e => { if (e.key === 'Enter') doLogin(); });
-
-    async function doLogin() {
-      const user = loginUsername.value.trim();
-      const pass = loginPassword.value;
-
-      if (!user || !pass) {
-        showLoginError('Please enter your username and password');
-        return;
-      }
-
-      loginBtn.disabled = true;
-      loginBtn.textContent = 'AUTHENTICATING...';
-      loginError.classList.remove('visible');
-
-      try {
-        const res = await fetch(`${API_BASE}/auth/login`, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ username: user, password: pass })
-        });
-
-        if (!res.ok) {
-          const err = await res.json().catch(() => ({}));
-          throw new Error(err.detail || 'Authentication failed');
-        }
-
-        const data = await res.json();
-        token       = data.token;
-        displayName = data.display_name;
-        username    = data.username;
-
-        sessionStorage.setItem('zoey_token', token);
-        sessionStorage.setItem('zoey_display_name', displayName);
-        sessionStorage.setItem('zoey_username', username);
-
-        showChat();
-
-      } catch (err) {
-        showLoginError(err.message || 'Authentication failed');
-      } finally {
-        loginBtn.disabled = false;
-        loginBtn.textContent = 'AUTHENTICATE';
-      }
-    }
+    loginBtn.addEventListener('click', () => {
+      window.location.href = `${API_BASE}/auth/login`;
+    });
 
     function showLoginError(msg) {
       loginError.textContent = '⚠ ' + msg;
@@ -721,7 +656,6 @@
       loginScreen.classList.add('hidden');
       headerUsername.textContent = username.toUpperCase();
       welcomeName.textContent    = displayName.split(' ')[0] || username;
-      loginPassword.value = '';
     }
 
     // ── Logout ────────────────────────────────────────────────────
@@ -730,8 +664,6 @@
       sessionStorage.clear();
       loginScreen.classList.remove('hidden');
       loginError.classList.remove('visible');
-      loginUsername.value = '';
-      loginPassword.value = '';
       // Clear chat messages
       const msgs = messagesEl.querySelectorAll('.message');
       msgs.forEach(m => m.remove());

@@ -1,145 +1,174 @@
-# Zoey Graystone — A Full AI Agent and Assistant
+# Zoey Graystone — AI Agent and Assistant
 # Graystone Solutions: Project Zoey
-# 
+
 ## Philosophy
-Project Zoey Graystone is an exploratory effort to discover the scope and scalabilty of the current private A.I. landscape without the backing of a major congolomorate and teams of developers. Graystone understands that many other project such as this exist our attempt is not to surpase these projects, but merely to understand this endevor and cultivate our own knowledge in the bleeding edge field of agentic AI as we attempt to all reach the singularity together.
+
+Project Zoey Graystone is an exploratory effort to discover the scope and scalability of the current private AI landscape without the backing of a major conglomerate or teams of developers. Graystone understands that many other projects like this exist — our attempt is not to surpass them, but merely to understand this endeavor and cultivate our own knowledge in the bleeding edge field of agentic AI as we attempt to reach the singularity together.
+
 ## Foundation
-Zoey is written in the python language and developed to operate on a static Linux based VPS. Zoey brings her own dependency stack to the host and installs accordingly. A basic Zoey install will operate using an on premise LLM model (Mystrial) and querey more advanced AIs (Anthropic) as needed.
+
+Zoey is written in Python and developed to operate on a Linux-based VPS. Zoey brings her own dependency stack to the host and installs accordingly. A basic Zoey install operates using an on-premise LLM model (Mixtral via Ollama) and queries more advanced AI (Anthropic Claude) as needed.
 
 ## Evolution
-Future plans include several code modules which can be installed for interfacing with various platforms such as social media networks, or smart home systems, for life-managment and assistance platforms.
+
+Future plans include several code modules for interfacing with various platforms such as social media networks and smart home systems for life-management and assistance.
 
 For more information see: [Project Zoey](https://graystone.solutions/project_zoey)
 
-## CURRENT ### 
-## Phase 1: Local LLM and LDAP
-Moved from Mistral API calls to local Mistral ollama with pull of LLM mixtral:8x7b
-Added support for LDAP Authentication to a local DC when testing in a local network
+---
+
+## CURRENT — Phase 2: Azure AD Authentication
+
+Replaced LDAP authentication with Microsoft Azure Active Directory (Entra ID) using OAuth2 / OIDC.
+
+- Users click **Sign in with Microsoft** and are redirected to the Microsoft login page
+- Azure AD issues an authorization code that Zoey exchanges for an access token via MSAL
+- Microsoft Graph API is queried for user profile and group membership
+- Access is restricted to members of the `zoey_users` Azure AD group
+- Zoey issues its own signed JWT for subsequent API calls
+
+## Phase 1: Local LLM
+
+Moved from Mistral API calls to a locally hosted Mixtral model via Ollama (`mixtral:8x7b`).
 
 ## Phase 0: Backend Scaffold + PWA Frontend
-## Stack
-| Layer       | Technology                          |
-|-------------|-------------------------------------|
-| Backend     | Python 3.12, FastAPI, Uvicorn       |
-| AI (Standard) | Mistral AI (mistral-small-latest) |
-| AI (Advanced) | Anthropic Claude (claude-sonnet)  |
-| Database    | MongoDB 7 (4.4 if lacking AVS)      |
-| DB Admin UI | Mongo Express (port 8081)           |
-| Frontend    | Vanilla HTML/CSS/JS PWA             |
-| Networking  | ZeroTier (dev), HTTPS (production)  |
-| Registry    | Github Registry                     |
 
 ---
 
-## First-Time Setup on Local Host Linux Server
+## Stack
+
+| Layer          | Technology                              |
+|----------------|-----------------------------------------|
+| Backend        | Python 3.12, FastAPI, Uvicorn           |
+| AI (Standard)  | Mixtral 8x7b (Ollama, on-premise)       |
+| AI (Advanced)  | Anthropic Claude (claude-sonnet)        |
+| Auth           | Azure Active Directory (MSAL / OIDC)    |
+| Database       | MongoDB 7                               |
+| DB Admin UI    | Mongo Express (port 8081)               |
+| Frontend       | Vanilla HTML/CSS/JS PWA                 |
+| Networking     | ZeroTier (dev), HTTPS (production)      |
+| Registry       | GitHub Container Registry               |
+
+---
+
+## First-Time Setup
 
 ### 1. Clone the repo
+
 ```bash
 git clone https://github.com/GraystoneSolutions/zoeygraystone.git
 cd zoeygraystone
 ```
-### 2. Run Bootstrap file to start the install to /opt/graystone/zoey
-chmod +x zoey_bootstrap.sh
-Before running this file, pass the git branch hash as a value.
-Example:
 
-./sh zoey_bootstrap.sh master
+### 2. Run the bootstrap script
 
-### 3. Create your .env file
+```bash
+chmod +x zoeybootstrap.sh
+./zoeybootstrap.sh master
+```
+
+The bootstrap installs Zoey to `/opt/graystone/zoey` and triggers the Docker build.
+
+### 3. Create your `.env` file
+
 ```bash
 cp .env.example .env
 nano .env
 ```
-Fill in your real API keys. **Never commit .env to git.**
 
+Fill in all required values. **Never commit `.env` to git.**
+
+```env
+# Anthropic
+ANTHROPIC_API_KEY=
+
+# Azure AD (required for login)
+AZURE_CLIENT_ID=
+AZURE_CLIENT_SECRET=
+AZURE_TENANT_ID=
+AZURE_REDIRECT_URI=https://<your-domain>/auth/callback
+
+# Zoey Auth
+ZOEY_AD_GROUP=zoey_users
+JWT_SECRET=
+JWT_EXPIRY_HOURS=8
+
+# MongoDB
+MONGO_URI=mongodb://zoeydb:27017/zoey
+
+# Ollama
+OLLAMA_URL=http://ollama:11434
+OLLAMA_MODEL=mixtral:8x7b
 ```
-### 4. Create your .env file
-Bootstrap will start the docker build process by the following command:
-docker compose up --build -d zoey_docker-compose.yml
 
+### 4. Start the stack
+
+```bash
+docker compose -f zoey_docker-compose.yml up --build -d
 ```
 
 ### 5. Verify everything is running
+
 ```bash
 docker compose ps
 docker compose logs zoeycore --follow
 ```
+
+---
+
+## Azure AD App Registration
+
+Before users can log in you must register Zoey in your Azure tenant:
+
+1. **Azure Portal → App registrations → New registration**
+2. Set the redirect URI to `https://<your-domain>/auth/callback`
+3. Under **API permissions**, add `User.Read` (Microsoft Graph, delegated)
+4. Create a **Client secret** and copy it to `AZURE_CLIENT_SECRET`
+5. Ensure the `zoey_users` group exists in your tenant and users are members of it
+
 ---
 
 ## Access Points
 
-| Service       | URL                                  |
-|---------------|--------------------------------------|
-| Zoey Chat PWA | http://10.242.1.1:8000              |
-| API Docs      | http://10.242.1.1:8000/docs          |
-| API Health    | http://10.242.1.1:8000/health        |
-| MongoDB UI    | http://10.242.1.1:8081               |
+| Service       | URL                              |
+|---------------|----------------------------------|
+| Zoey Chat PWA | http://10.242.1.1:8000           |
+| API Docs      | http://10.242.1.1:8000/docs      |
+| API Health    | http://10.242.1.1:8000/health    |
+| MongoDB UI    | http://10.242.1.1:8081           |
 
-*(Replace 10.242.1.1 with your dedicated server IP)*
+*(Replace `10.242.1.1` with your server IP)*
 
 ---
 
 ## API Endpoints
 
-```
-Set `mode` to `"advanced"` to route to Claude instead of Mistral.
+| Method   | Path             | Description                                   |
+|----------|------------------|-----------------------------------------------|
+| `GET`    | `/auth/login`    | Redirects browser to Microsoft login          |
+| `GET`    | `/auth/callback` | Receives auth code, issues Zoey JWT           |
+| `POST`   | `/chat`          | Send a message (Bearer token required)        |
+| `GET`    | `/history`       | Retrieve conversation history                 |
+| `DELETE` | `/history`       | Clear conversation history                    |
+| `POST`   | `/memory`        | Save a fact to Zoey's memory                  |
+| `GET`    | `/health`        | Health check                                  |
 
-### GET /history/{session_id}
-Retrieve conversation history for a session.
-
-### DELETE /history/{session_id}
-Clear conversation history for a session.
-
-### GET /health
-Health check — returns status and version.
+Set `mode` to `"advanced"` in `/chat` to route to Claude instead of Mixtral.
 
 ---
 
-## Development Workflow
+## Project Structure
 
-### Watch logs live
-```bash
-docker compose logs -f
----
-Emergency Maintenance Controls
-# CAUTION: Know what you are doing! This will nuke all containers and roll a clean Zoey!
-# Show all running Docker Containers
-docker ps -a
-
-Build Docker Containers Up:
-docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up
-
-Tear Dockers Containers Down:
-docker compose -f /home/graystone/zoey/zoey_docker-compose.yml down
-
-Fix Corrupted Containers
-sudo kill -9 $(docker inspect zoeycore --format='{{.State.Pid}}')
-sudo kill -9 $(docker inspect zoeydb-ui --format='{{.State.Pid}}')
-sudo kill -9 $(docker inspect zoeydb --format='{{.State.Pid}}')
-
-# Force Remove all Containers
-docker rm -f $(docker ps -aq)
-
-# Clean up and restart docker
-docker network prune -f
-sudo systemctl restart docker
-docker ps -a
-
-# Reinstall all containers
-docker compose -f /home/graystone/zoey/zoey_docker-compose.yml up -d
-
-
-## Phase 1: Project Structure
 ```
 zoey/
-├── docker-compose.yml          # Full stack definition
+├── zoey_docker-compose.yml     # Full stack definition
 ├── .env.example                # Copy to .env and fill in secrets
 ├── .gitignore
 ├── zoeycore/
 │   ├── Dockerfile
 │   ├── main.py                 # FastAPI app + AI routing
-│   └── auth.py                 # Authenticate to LDAP Server
-│   └── requirements.txt|   
+│   ├── auth.py                 # Azure AD OIDC authentication
+│   └── requirements.txt
 ├── pwa/
 │   └── index.html              # PWA chat frontend
 ├── data/
@@ -150,12 +179,39 @@ zoey/
 
 ---
 
-## Zoey Phase Roadmap
+## Emergency Maintenance
 
-| Phase | Goal                                  | Status     |
-|-------|---------------------------------------|------------|
-| 0     | Backend scaffold + PWA frontend       | ✅ Done    |
-| 1     | Authentication, Memory, Persistence   | In Test    |           
-| 2     | Memory, personality, long-term context| Planned    |
-| 3     | Azure production deployment + AKS     | Planned    |
-| 4     | Swift UI for Apple Ecosystem          | Planned    |
+```bash
+# Show running containers
+docker ps -a
+
+# Start stack
+docker compose -f /opt/graystone/zoey/zoey_docker-compose.yml up -d
+
+# Stop stack
+docker compose -f /opt/graystone/zoey/zoey_docker-compose.yml down
+
+# Force remove all containers
+docker rm -f $(docker ps -aq)
+
+# Clean up networks and restart Docker
+docker network prune -f
+sudo systemctl restart docker
+
+# Kill a specific stuck container
+sudo kill -9 $(docker inspect zoeycore --format='{{.State.Pid}}')
+sudo kill -9 $(docker inspect zoeydb-ui --format='{{.State.Pid}}')
+sudo kill -9 $(docker inspect zoeydb --format='{{.State.Pid}}')
+```
+
+---
+
+## Phase Roadmap
+
+| Phase | Goal                                        | Status      |
+|-------|---------------------------------------------|-------------|
+| 0     | Backend scaffold + PWA frontend             | Done        |
+| 1     | Local LLM (Mixtral via Ollama)              | Done        |
+| 2     | Azure AD authentication + persistent memory | In Progress |
+| 3     | Azure production deployment + AKS           | Planned     |
+| 4     | Swift UI for Apple Ecosystem                | Planned     |

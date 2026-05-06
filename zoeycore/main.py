@@ -7,7 +7,9 @@ from pymongo import MongoClient
 from pymongo.errors import ServerSelectionTimeoutError, ConnectionFailure
 from datetime import datetime, timezone
 from contextlib import asynccontextmanager
-from auth import authenticate_ldap, create_jwt, verify_jwt
+from auth import authenticate_azure, create_jwt, verify_jwt, get_auth_url
+from fastapi.responses import RedirectResponse
+from urllib.parse import urlencode
 import httpx
 import logging
 import os
@@ -71,14 +73,6 @@ You will be told who you are speaking with at the start of each session.
 Use their name naturally and remember context about them."""
 
 # ── Models ────────────────────────────────────────────────────────────────────
-class LoginRequest(BaseModel):
-    username: str
-    password: str
-
-class LoginResponse(BaseModel):
-    token: str
-    display_name: str
-    username: str
 
 class ChatRequest(BaseModel):
     message: str
@@ -127,27 +121,39 @@ def health_check():
     return {"status": "online", "assistant": "Zoey", "version": "0.2.0"}
 
 
-@app.post("/auth/login", response_model=LoginResponse)
-def login(req: LoginRequest):
-    user  = authenticate_ldap(req.username, req.password)
+@app.get("/auth/login")
+def login():
+    """Redirect the browser to Microsoft's login page."""
+    return RedirectResponse(get_auth_url())
+
+
+@app.get("/auth/callback")
+async def auth_callback(code: str = None, error: str = None, error_description: str = None):
+    """Receive the Azure AD authorization code, exchange it, and redirect the PWA with a token."""
+    if error:
+        logger.warning(f"Azure auth error: {error} — {error_description}")
+        params = urlencode({"auth_error": error_description or error})
+        return RedirectResponse(f"/#?{params}")
+
+    if not code:
+        return RedirectResponse("/#?auth_error=missing_code")
+
+    user  = await authenticate_azure(code)
     token = create_jwt(user)
 
-    # Upsert user record in MongoDB
     db["users"].update_one(
         {"username": user["username"]},
-        {"$set": {
-            **user,
-            "last_seen": datetime.now(timezone.utc)
-        }},
-        upsert=True
+        {"$set": {**user, "last_seen": datetime.now(timezone.utc)}},
+        upsert=True,
     )
 
     logger.info(f"Login: {user['display_name']} ({user['username']})")
-    return LoginResponse(
-        token=token,
-        display_name=user["display_name"],
-        username=user["username"]
-    )
+    params = urlencode({
+        "token":        token,
+        "display_name": user["display_name"],
+        "username":     user["username"],
+    })
+    return RedirectResponse(f"/#?{params}")
 
 
 @app.post("/chat", response_model=ChatResponse)
