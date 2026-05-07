@@ -9,6 +9,12 @@ from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
 
 logger = logging.getLogger("zoey.auth")
 
+# ── Scopes ─────────────────────────────────────────────────────────────────────
+SCOPES = [
+    "User.Read",
+    "GroupMember.Read.All"
+]
+
 # ── Entra ID Config ────────────────────────────────────────────────────────────
 ENTRA_TENANT_ID     = os.environ.get("ENTRA_TENANT_ID",     "")
 ENTRA_CLIENT_ID     = os.environ.get("ENTRA_CLIENT_ID",     "")
@@ -29,26 +35,25 @@ JWT_EXPIRY_H  = int(os.environ.get("JWT_EXPIRY_HOURS", "8"))
 security = HTTPBearer()
 
 # ── MSAL Confidential Client ───────────────────────────────────────────────────
-def get_msal_app() -> msal.ConfidentialClientApplication:
+def _msal_app() -> msal.ConfidentialClientApplication:
+    tenant_id     = os.environ.get("AZURE_TENANT_ID", "")
+    client_id     = os.environ.get("AZURE_CLIENT_ID", "")
+    client_secret = os.environ.get("AZURE_CLIENT_SECRET", "")
+    authority     = f"https://login.microsoftonline.com/{tenant_id}"
+    
     return msal.ConfidentialClientApplication(
-        client_id=ENTRA_CLIENT_ID,
-        client_credential=ENTRA_CLIENT_SECRET,
-        authority=ENTRA_AUTHORITY
+        client_id,
+        authority=authority,
+        client_credential=client_secret,
     )
 
 # ── Step 1: Generate Microsoft login URL ──────────────────────────────────────
-def get_auth_url(state: str = "") -> str:
-    """
-    Generate the Microsoft Entra ID authorization URL.
-    The PWA redirects the user to this URL to begin the OAuth2 flow.
-    """
-    app = get_msal_app()
-    auth_url = app.get_authorization_request_url(
-        scopes=ENTRA_SCOPES,
-        redirect_uri=ENTRA_REDIRECT_URI,
-        state=state
+def get_auth_url() -> str:
+    redirect_uri = os.environ.get("AZURE_REDIRECT_URI", "http://localhost:8000/auth/callback")
+    return _msal_app().get_authorization_request_url(
+        scopes=SCOPES,
+        redirect_uri=redirect_uri,
     )
-    return auth_url
 
 # ── Step 2: Exchange auth code for tokens ─────────────────────────────────────
 def exchange_code_for_token(code: str) -> dict:
@@ -56,7 +61,7 @@ def exchange_code_for_token(code: str) -> dict:
     Exchange the authorization code returned by Microsoft for an access token.
     Called by the /auth/callback endpoint after Microsoft redirects back.
     """
-    app = get_msal_app()
+    app = _msal_app()
     result = app.acquire_token_by_authorization_code(
         code=code,
         scopes=ENTRA_SCOPES,

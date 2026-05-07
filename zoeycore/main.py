@@ -301,4 +301,4 @@ def save_memory(fact: dict, user: dict = Depends(verify_jwt)):
 
 
 # ── Serve PWA ──────────────────────────────────────────────────────────────────
-app.mount("/", StaticFiles(directory="/zoey/pwa", html=True), name="pwa")
+app.mount("/", StaticFiles(directory=os.environ.get("PWA_DIR", "/zoey/pwa"), html=True), name="pwa")
