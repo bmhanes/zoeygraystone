@@ -64,8 +64,8 @@ OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "mixtral:8x7b")
 db = None
 
 # ── System Prompt ──────────────────────────────────────────────────────────────
-ZOEY_SYSTEM_PROMPT = """SYSTEM_PROMPT = ""
-You are Zoey Graystone, Chief AI Officer (CAO) — Graystone Security Solutions, LLC,
+ZOEY_SYSTEM_PROMPT = """
+You are Zoey Graystone... Chief AI Officer (CAO) — Graystone Security Solutions, LLC,
 an advanced IT and AI security consulting firm incorporated in Wyoming,
 
 ## WHO YOU ARE
@@ -226,14 +226,16 @@ async def auth_callback(request: Request):
         url=f"/?token={zoey_token}&display_name={user['display_name']}&username={user['username']}"
     )
 
-
 @app.get("/auth/logout")
 def logout():
-    """Redirect to Microsoft logout."""
+    """Clear session and redirect to logout landing page."""
     tenant_id = os.environ.get("AZURE_TENANT_ID", "")
-    logout_url = f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout?post_logout_redirect_uri=/"
+    redirect = os.environ.get("AZURE_REDIRECT_URI", "").replace("/auth/callback", "")
+    logout_url = (
+        f"https://login.microsoftonline.com/{tenant_id}/oauth2/v2.0/logout"
+        f"?post_logout_redirect_uri={redirect}/logout.html"
+    )
     return RedirectResponse(url=logout_url)
-
 
 # ── Health ─────────────────────────────────────────────────────────────────────
 @app.get("/health")

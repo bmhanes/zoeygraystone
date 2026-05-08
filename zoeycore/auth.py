@@ -15,16 +15,6 @@ SCOPES = [
     "GroupMember.Read.All"
 ]
 
-# ── Entra ID Config ────────────────────────────────────────────────────────────
-ENTRA_TENANT_ID     = os.environ.get("ENTRA_TENANT_ID",     "")
-ENTRA_CLIENT_ID     = os.environ.get("ENTRA_CLIENT_ID",     "")
-ENTRA_CLIENT_SECRET = os.environ.get("ENTRA_CLIENT_SECRET", "")
-ENTRA_AUTHORITY     = f"https://login.microsoftonline.com/{ENTRA_TENANT_ID}"
-ENTRA_REDIRECT_URI  = os.environ.get("ENTRA_REDIRECT_URI",  "http://localhost:8000/auth/callback")
-ENTRA_SCOPES        = [
-    "https://graph.microsoft.com/User.Read",
-    "https://graph.microsoft.com/GroupMember.Read.All"
-]
 ZOEY_AD_GROUP       = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
 
 # ── JWT Config ─────────────────────────────────────────────────────────────────
@@ -64,7 +54,7 @@ def exchange_code_for_token(code: str) -> dict:
     app = _msal_app()
     result = app.acquire_token_by_authorization_code(
         code=code,
-        scopes=ENTRA_SCOPES,
+        scopes=SCOPES,  # ← was ENTRA_SCOPES
         redirect_uri=os.environ.get("AZURE_REDIRECT_URI", "http://localhost:8000/auth/callback")
     )
 
