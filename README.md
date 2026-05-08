@@ -16,8 +16,25 @@ Future plans include several code modules for interfacing with various platforms
 For more information see: [Project Zoey](https://graystone.solutions/project_zoey)
 
 ---
+## IN PROGRESS: Phase 3: Personality, Orginization, Persistant Memory
+Zoey will get a full personality matrix, backstory, demographics, and her basic modus operandia with a baked in code of ethics and conduct.
 
-## CURRENT — Phase 2: Azure AD Authentication
+Locial flow patterns will be developed for workflow processing and automation.
+Memory will be programmed to be persistence per containers or logical flow path. Zoey will be able to recall entire memory chains about whomever she is speaking with, going beyond simple indentification.
+
+Security measures and controls put in place
+- Zoey_Developers Group
+- Graystone_Staff Group
+
+Rights will begin to form around groups. For example: when Zoey goes live, not every basic user will have the right to turn on Advanced thinking and generate a bill via the Graystone Claude Code API.
+
+Graystone Staff will get access in the future to toolkits not available to the general public. This phase will build the access structure and API backend hooks to handle future toolkits.
+
+API Hooks and Toolkits will be in a future phase.
+
+
+## COMPLETE Phase 2: Azure AD Hosting and Microsoft Authentication
+- Zoey Development environment is live!
 
 Replaced LDAP authentication with Microsoft Azure Active Directory (Entra ID) using OAuth2 / OIDC.
 
@@ -27,12 +44,9 @@ Replaced LDAP authentication with Microsoft Azure Active Directory (Entra ID) us
 - Access is restricted to members of the `zoey_users` Azure AD group
 - Zoey issues its own signed JWT for subsequent API calls
 
-## Phase 1: Local LLM
-
-Moved from Mistral API calls to a locally hosted Mixtral model via Ollama (`mixtral:8x7b`).
-
-## Phase 0: Backend Scaffold + PWA Frontend
-
+---
+# Zoey Runs in a full Azure Stack. For Self-Hosted Installation Options Please Email:
+DevOps At Graystone.Solutions
 ---
 
 ## Stack
@@ -49,97 +63,6 @@ Moved from Mistral API calls to a locally hosted Mixtral model via Ollama (`mixt
 | Networking     | ZeroTier (dev), HTTPS (production)      |
 | Registry       | GitHub Container Registry               |
 
----
-
-## First-Time Setup
-
-### 1. Clone the repo
-
-```bash
-git clone https://github.com/GraystoneSolutions/zoeygraystone.git
-cd zoeygraystone
-```
-
-### 2. Run the bootstrap script
-
-```bash
-chmod +x zoeybootstrap.sh
-./zoeybootstrap.sh master
-```
-
-The bootstrap installs Zoey to `/opt/graystone/zoey` and triggers the Docker build.
-
-### 3. Create your `.env` file
-
-```bash
-cp .env.example .env
-nano .env
-```
-
-Fill in all required values. **Never commit `.env` to git.**
-
-```env
-# Anthropic
-ANTHROPIC_API_KEY=
-
-# Azure AD (required for login)
-AZURE_CLIENT_ID=
-AZURE_CLIENT_SECRET=
-AZURE_TENANT_ID=
-AZURE_REDIRECT_URI=https://<your-domain>/auth/callback
-
-# Zoey Auth
-ZOEY_AD_GROUP=zoey_users
-JWT_SECRET=
-JWT_EXPIRY_HOURS=8
-
-# MongoDB
-MONGO_URI=mongodb://zoeydb:27017/zoey
-
-# Ollama
-OLLAMA_URL=http://ollama:11434
-OLLAMA_MODEL=mixtral:8x7b
-```
-
-### 4. Start the stack
-
-```bash
-docker compose -f zoey_docker-compose.yml up --build -d
-```
-
-### 5. Verify everything is running
-
-```bash
-docker compose ps
-docker compose logs zoeycore --follow
-```
-
----
-
-## Azure AD App Registration
-
-Before users can log in you must register Zoey in your Azure tenant:
-
-1. **Azure Portal → App registrations → New registration**
-2. Set the redirect URI to `https://<your-domain>/auth/callback`
-3. Under **API permissions**, add `User.Read` (Microsoft Graph, delegated)
-4. Create a **Client secret** and copy it to `AZURE_CLIENT_SECRET`
-5. Ensure the `zoey_users` group exists in your tenant and users are members of it
-
----
-
-## Access Points
-
-| Service       | URL                              |
-|---------------|----------------------------------|
-| Zoey Chat PWA | http://10.242.1.1:8000           |
-| API Docs      | http://10.242.1.1:8000/docs      |
-| API Health    | http://10.242.1.1:8000/health    |
-| MongoDB UI    | http://10.242.1.1:8081           |
-
-*(Replace `10.242.1.1` with your server IP)*
-
----
 
 ## API Endpoints
 
@@ -177,34 +100,6 @@ zoey/
 └── backups/                    # Backups (gitignored)
 ```
 
----
-
-## Emergency Maintenance
-
-```bash
-# Show running containers
-docker ps -a
-
-# Start stack
-docker compose -f /opt/graystone/zoey/zoey_docker-compose.yml up -d
-
-# Stop stack
-docker compose -f /opt/graystone/zoey/zoey_docker-compose.yml down
-
-# Force remove all containers
-docker rm -f $(docker ps -aq)
-
-# Clean up networks and restart Docker
-docker network prune -f
-sudo systemctl restart docker
-
-# Kill a specific stuck container
-sudo kill -9 $(docker inspect zoeycore --format='{{.State.Pid}}')
-sudo kill -9 $(docker inspect zoeydb-ui --format='{{.State.Pid}}')
-sudo kill -9 $(docker inspect zoeydb --format='{{.State.Pid}}')
-```
-
----
 
 ## Phase Roadmap
 
@@ -212,6 +107,11 @@ sudo kill -9 $(docker inspect zoeydb --format='{{.State.Pid}}')
 |-------|---------------------------------------------|-------------|
 | 0     | Backend scaffold + PWA frontend             | Done        |
 | 1     | Local LLM (Mixtral via Ollama)              | Done        |
-| 2     | Azure AD authentication + persistent memory | In Progress |
-| 3     | Azure production deployment + AKS           | Planned     |
-| 4     | Swift UI for Apple Ecosystem                | Planned     |
+| 2     | Azure Development + Microsft Authentication | Done        |
+| 3     | Personality, Orginization, Persistant Memory| In Progress |
+| 4     | Premium Upgrades Token System + API Hooks   | Planned     |
+| 5     | Azure Production Deployment with AKS        | Planned     |
+| 6     | API Enabled Toolkits + Add-ons for Premium  | Planned     |
+| 7     | Swift UI for Apple Ecosystem                | Planned     |
+| 8     | UI Migration to Flutter for Cross Platform  | Considering |
+
