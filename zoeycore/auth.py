@@ -65,7 +65,7 @@ def exchange_code_for_token(code: str) -> dict:
     result = app.acquire_token_by_authorization_code(
         code=code,
         scopes=ENTRA_SCOPES,
-        redirect_uri=ENTRA_REDIRECT_URI
+        redirect_uri=os.environ.get("AZURE_REDIRECT_URI", "http://localhost:8000/auth/callback")
     )
 
     if "error" in result:
