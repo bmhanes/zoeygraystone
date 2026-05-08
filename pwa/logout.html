@@ -1,0 +1,206 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Signed Out — Zoey | Graystone Solutions</title>
+  <link rel="icon" type="image/x-icon" href="zoey_favicon.ico"/>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Space+Mono:wght@400;700&family=Syne:wght@400;600;800&display=swap" rel="stylesheet" />
+
+  <style>
+    :root {
+      --bg:       #0a0f1e;
+      --surface:  #111827;
+      --border:   #1e2d47;
+      --accent:   #00d4ff;
+      --text:     #e2e8f0;
+      --text-dim: #64748b;
+      --success:  #00e5a0;
+    }
+
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: 'Syne', sans-serif;
+      min-height: 100dvh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 24px;
+    }
+
+    body::before {
+      content: '';
+      position: fixed;
+      inset: 0;
+      background-image:
+        linear-gradient(rgba(0, 212, 255, 0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0, 212, 255, 0.03) 1px, transparent 1px);
+      background-size: 40px 40px;
+      pointer-events: none;
+    }
+
+    .card {
+      position: relative;
+      z-index: 1;
+      width: 100%;
+      max-width: 420px;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      padding: 48px 40px;
+      text-align: center;
+    }
+
+    .logo {
+      width: 64px;
+      height: 64px;
+      border-radius: 50%;
+      background: linear-gradient(135deg, #0066ff, #00d4ff);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-family: 'Space Mono', monospace;
+      font-size: 22px;
+      font-weight: 700;
+      color: var(--bg);
+      margin: 0 auto 24px;
+    }
+
+    h1 {
+      font-size: 22px;
+      font-weight: 800;
+      letter-spacing: 0.04em;
+      margin-bottom: 12px;
+    }
+
+    .subtitle {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--accent);
+      letter-spacing: 0.1em;
+      margin-bottom: 32px;
+    }
+
+    .message {
+      font-size: 14px;
+      line-height: 1.7;
+      color: var(--text-dim);
+      margin-bottom: 32px;
+    }
+
+    .message strong {
+      color: var(--text);
+    }
+
+    .countdown-bar {
+      width: 100%;
+      height: 3px;
+      background: var(--border);
+      border-radius: 2px;
+      overflow: hidden;
+      margin-bottom: 16px;
+    }
+
+    .countdown-fill {
+      height: 100%;
+      width: 100%;
+      background: linear-gradient(90deg, #0066ff, #00d4ff);
+      border-radius: 2px;
+      animation: countdown 10s linear forwards;
+      transform-origin: left;
+    }
+
+    @keyframes countdown {
+      from { transform: scaleX(1); }
+      to   { transform: scaleX(0); }
+    }
+
+    .countdown-text {
+      font-family: 'Space Mono', monospace;
+      font-size: 10px;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+      margin-bottom: 24px;
+    }
+
+    .redirect-btn {
+      display: inline-block;
+      padding: 12px 28px;
+      background: linear-gradient(135deg, #0066ff, #00d4ff);
+      border-radius: 10px;
+      color: var(--bg);
+      font-family: 'Syne', sans-serif;
+      font-size: 13px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-decoration: none;
+      transition: opacity 0.2s ease;
+    }
+
+    .redirect-btn:hover { opacity: 0.85; }
+
+    .security-note {
+      margin-top: 24px;
+      font-family: 'Space Mono', monospace;
+      font-size: 9px;
+      color: var(--text-dim);
+      letter-spacing: 0.06em;
+      line-height: 1.8;
+    }
+
+    .check {
+      color: var(--success);
+      margin-right: 4px;
+    }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="logo">Z</div>
+    <h1>You've Been Signed Out</h1>
+    <div class="subtitle">GRAYSTONE SOLUTIONS · AI ASSISTANT</div>
+
+    <div class="message">
+      Your session has ended and <strong>all session data has been cleared</strong>
+      from this device. Your conversation history remains securely stored
+      in your personal Zoey workspace.
+    </div>
+
+    <div class="countdown-bar">
+      <div class="countdown-fill"></div>
+    </div>
+    <div class="countdown-text">REDIRECTING TO GRAYSTONE.SOLUTIONS IN <span id="counter">10</span> SECONDS</div>
+
+    <a href="https://graystone.solutions" class="redirect-btn">Go Now</a>
+
+    <div class="security-note">
+      <span class="check">✓</span> SESSION TOKEN CLEARED<br>
+      <span class="check">✓</span> MICROSOFT SESSION ENDED<br>
+      <span class="check">✓</span> LOCAL STORAGE CLEARED
+    </div>
+  </div>
+
+  <script>
+    // Clear all session data
+    sessionStorage.clear();
+    localStorage.clear();
+
+    // Countdown and redirect
+    let count = 10;
+    const counter = document.getElementById('counter');
+    const interval = setInterval(() => {
+      count--;
+      counter.textContent = count;
+      if (count <= 0) {
+        clearInterval(interval);
+        window.location.href = 'https://graystone.solutions';
+      }
+    }, 1000);
+  </script>
+</body>
+</html>
