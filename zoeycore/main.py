@@ -60,6 +60,43 @@ MISTRAL_API_KEY  = os.environ.get("MISTRAL_API_KEY", "")
 OLLAMA_URL       = os.environ.get("OLLAMA_URL", "")
 OLLAMA_MODEL     = os.environ.get("OLLAMA_MODEL", "mixtral:8x7b")
 
+# ── RBAC Group Config ──────────────────────────────────────────────────────────
+PREMIUM_GROUPS = {
+    g.strip().lower()
+    for g in os.environ.get(
+        "ZOEY_PREMIUM_GROUPS",
+        "gss_premium,zoey_prod_premium,zoey_admin"
+    ).split(",")
+    if g.strip()
+}
+
+ADMIN_GROUPS = {
+    g.strip().lower()
+    for g in os.environ.get(
+        "ZOEY_ADMIN_GROUPS",
+        "zoey_admin"
+    ).split(",")
+    if g.strip()
+}
+
+def select_api(user: dict, requested_mode: str) -> str:
+    """
+    Determine which AI backend this user may access based on group membership.
+    Premium and admin groups get Claude (advanced).
+    All others are silently downgraded to Mistral (standard).
+    """
+    user_groups = {g.lower() for g in user.get("groups", [])}
+    is_premium  = bool(user_groups & PREMIUM_GROUPS)
+    is_admin    = bool(user_groups & ADMIN_GROUPS)
+
+    if requested_mode == "advanced":
+        if is_premium or is_admin:
+            return "advanced"
+        else:
+            logger.info(f"User {user.get('sub')} requested advanced mode — downgraded to standard (not in premium group)")
+            return "standard"
+    return "standard"
+
 # ── DB ─────────────────────────────────────────────────────────────────────────
 db = None
 
@@ -276,9 +313,11 @@ async def chat(req: ChatRequest, user: dict = Depends(verify_jwt)):
         logger.error(f"MongoDB write error: {e}")
         raise HTTPException(status_code=503, detail="Database unavailable")
 
-    # ── Route to correct model ─────────────────────────────────────────────────
+    # ── Route to correct model via RBAC gate ──────────────────────────────────
+    mode = select_api(user, req.mode)
+
     try:
-        if req.mode == "advanced":
+        if mode == "advanced":
             # Claude for complex reasoning
             response = anthropic_client.messages.create(
                 model="claude-sonnet-4-5-20250929",

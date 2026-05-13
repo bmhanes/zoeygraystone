@@ -15,7 +15,17 @@ SCOPES = [
     "GroupMember.Read.All"
 ]
 
-ZOEY_AD_GROUP       = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
+ZOEY_AD_GROUP = os.environ.get("ZOEY_AD_GROUP", "zoey_users")
+
+# ── Access gate groups — any member of these may log in ───────────────────────
+ACCESS_GROUPS = {
+    g.strip().lower()
+    for g in os.environ.get(
+        "ZOEY_ACCESS_GROUPS",
+        "zoey_users,zoey_admin,gss_users,gss_premium,gss_blue,zoey_dev_consultants,zoey_prod_users,zoey_prod_premium"
+    ).split(",")
+    if g.strip()
+}
 
 # ── JWT Config ─────────────────────────────────────────────────────────────────
 JWT_SECRET    = os.environ.get("JWT_SECRET",      "change_this_secret_in_env")
@@ -113,10 +123,10 @@ def get_user_profile(access_token: str) -> dict:
 
     logger.info(f"User profile retrieved: {user['display_name']} ({user['upn']})")
 
-    # Enforce zoey_users group membership
-    if ZOEY_AD_GROUP.lower() not in group_names:
+    # Enforce group membership — user must belong to at least one access group
+    if not any(g in ACCESS_GROUPS for g in group_names):
         logger.warning(
-            f"Access denied for {user['upn']} — not a member of '{ZOEY_AD_GROUP}'"
+            f"Access denied for {user['upn']} — not a member of any authorized group"
         )
         raise HTTPException(
             status_code=403,
@@ -136,6 +146,7 @@ def create_jwt(user: dict) -> str:
         "email":        user["email"],
         "department":   user["department"],
         "title":        user["title"],
+        "groups":       user.get("groups", []),
         "iat":          datetime.now(timezone.utc),
         "exp":          datetime.now(timezone.utc) + timedelta(hours=JWT_EXPIRY_H)
     }
