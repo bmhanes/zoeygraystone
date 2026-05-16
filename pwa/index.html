@@ -251,6 +251,17 @@
     .message.user .msg-bubble { background: #0f2545; border: 1px solid rgba(0, 102, 255, 0.3); border-bottom-right-radius: 4px; }
     .message.zoey .msg-bubble { background: var(--surface); border: 1px solid var(--border); border-bottom-left-radius: 4px; }
 
+    .msg-bubble h1, .msg-bubble h2, .msg-bubble h3 { color: var(--accent); margin: 8px 0 4px; font-size: 14px; }
+    .msg-bubble p { margin-bottom: 8px; }
+    .msg-bubble p:last-child { margin-bottom: 0; }
+    .msg-bubble ul, .msg-bubble ol { padding-left: 20px; margin-bottom: 8px; }
+    .msg-bubble li { margin-bottom: 4px; }
+    .msg-bubble code { background: rgba(0,212,255,0.1); border: 1px solid rgba(0,212,255,0.2); padding: 1px 5px; border-radius: 4px; font-family: var(--font-mono); font-size: 12px; }
+    .msg-bubble pre { background: rgba(0,0,0,0.3); border: 1px solid var(--border); border-radius: 8px; padding: 12px; overflow-x: auto; margin: 8px 0; }
+    .msg-bubble pre code { background: none; border: none; padding: 0; }
+    .msg-bubble strong { color: var(--text); }
+    .msg-bubble a { color: var(--accent); }
+
     .msg-meta { font-family: var(--font-mono); font-size: 9px; color: var(--text-dim); padding: 0 4px; }
     .message.user .msg-meta { text-align: right; }
 
@@ -341,6 +352,7 @@
       z-index: 1;
     }
   </style>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/marked/9.1.6/marked.min.js"></script>
 </head>
 <body>
 
@@ -571,7 +583,7 @@
       div.innerHTML = `
         <div class="msg-avatar" ${avatarStyle}>${avatarContent}</div>
         <div class="msg-content">
-          <div class="msg-bubble">${escapeHtml(text)}</div>
+          <div class="msg-bubble">${isUser ? escapeHtml(text) : marked.parse(text)}</div>
           <div class="msg-meta">${timeStr}${badgeHtml}</div>
         </div>
       `;
